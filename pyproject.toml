@@ -7,6 +7,6 @@ version = "0.0.1"
 dependencies = [] 
 requires-python = ">=3.11" 
 authors = [ 
-{name = "", email = ""}, 
+{name = "Mithra", email = "mithrabijumon@gmail.com"}, 
 ] 
 readme = "README.md" 
