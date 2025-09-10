@@ -1,2 +1,2 @@
-from .test import test_func
-from .preprocess import preprocess
+from visionflow.test import test_func
+from visionflow.preprocess import preprocess
