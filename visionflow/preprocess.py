@@ -1,7 +1,7 @@
 import cv2
 import numpy as np 
 
-def preprocess(img_path, size=(64,64), normalize = True, augment = False, noise_reduction = None):
+def preprocess_image(img_path, size=(64,64), normalize = True, augment = False, noise_reduction = None):
     
     def load_image(path):
         img = cv2.imread(path)
