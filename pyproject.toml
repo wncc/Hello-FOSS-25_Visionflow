@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 name = "visionflow" 
 version = "0.0.1" 
 dependencies = [
-"numpy",
-"opencv-python"
+    "numpy>=1.23",
+    "opencv-python>=4.8",
 ] 
 requires-python = ">=3.11" 
 authors = [ 
