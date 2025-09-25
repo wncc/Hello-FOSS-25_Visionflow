@@ -40,9 +40,7 @@ def preprocess_image(img_path, size=(64,64), normalize = True, augment = False, 
         #there are more normalization methods we can check later
         img_norm = (img - old_min) * (new_max - new_min) / (old_max - old_min + 1e-8) + new_min 
         return img_norm.astype(np.float32)
-
-
-
+    
     #Noise reduction functions
 
 
@@ -90,8 +88,110 @@ def preprocess_image(img_path, size=(64,64), normalize = True, augment = False, 
                 out[i, j] = np.sum(region * kernel, axis=(0,1))
         return out
 
-    
 
+        # Thresholding
+        def custom_thresholding_binary(img, threshold):
+            binary = np.where(img>=threshold, 255, 0).astype(img.dtype)
+            return binary
+        
+        def custom_thresholding_binary_inv(img, threshold):
+            binary_inv = np.where(img>=threshold, 0, 255).astype(img.dtype)
+            return binary_inv
+        
+        def custom_thresholding_tozero(img, threshold):
+            tozero = np.where(img>=threshold, img, 0).astype(img.dtype)
+            return tozero
+        
+        def custom_thresholding_tozero_inv(img, threshold):
+            tozero_inv = np.where(img>=threshold, 0, img).astype(img.dtype)
+            return tozero_inv
+        
+        def custom_thresholding_trunc(img, threshold):
+            trunc = np.where(img>=threshold, threshold, img).astype(img.dtype)
+            return trunc
+    
+        # Adaptive Mean
+        def adaptive_mean(img, ksize, c):
+            pad = ksize//2
+            padded_img = np.pad(img, ((pad, pad), (pad, pad)), mode='reflect')
+            out = np.zeros(img.shape, dtype=img.dtype)
+            for i in range(img.shape[0]):
+                for j in range(img.shape[1]):
+                    region = padded_img[i:i+ksize, j:j+ksize]
+                    threshold = np.mean(region, axis=(0,1)) - c
+                    out[i,j] = (img[i,j]>=threshold)*255
+            return out
+    
+        # Adaptive Gaussian        
+        def adaptive_gaussian(img, ksize, c):
+            sigma = 0.3 * ((ksize - 1) * 0.5 - 1) + 0.8  #Sigma is calculated inetrnally, so for large blockSize, sigma will be quite large, making it a smooth Gaussian. The effect is: the threshold is more influenced by nearby pixels than far-away ones.
+            kernel = Gaussian_kernel(ksize, sigma)
+            pad = ksize//2
+            padded_img = np.pad(img, ((pad, pad), (pad, pad)), mode='reflect')
+            out = np.zeros(img.shape, dtype=img.dtype)
+            for i in range(img.shape[0]):
+                for j in range(img.shape[1]):
+                    region = padded_img[i:i+ksize, j:j+ksize]
+                    threshold = np.sum(region * kernel, axis=(0,1)) - c
+                    out[i,j] = (img[i,j]>=threshold)*255
+            return out
+
+
+        #Augmentation
+        def flip_horizontal(img):
+            return img[:, ::-1]
+        
+        def flip_vertical(img):
+            return img[::-1, :]
+        
+        def rotate_90(img):  #Rotating by any other angle is trickier to implement
+            return np.rot90(img)  # counter-clockwise
+        
+        def adjust_brightness(img, value=50):
+            return np.clip(img + value, 0, 255).astype(np.uint8)  #Increase value by 50 and ensure that pixel values lie between 0 to 255
+        
+        def adjust_contrast(img, factor=1.2):
+            mean = img.mean()   #Find the mean of all pixel values. This is now the reference
+            return np.clip((img - mean) * factor + mean, 0, 255).astype(np.uint8) #First center it around 0, and then multiply by a factor. If factor is greater than 1, then pixels spread farther away from mean and if it's lesser then they come closer to mean. Then shift it back so that the brightness is not affected.
+        
+        def add_gaussian_noise(img, mean=0, sigma=25):
+            noise = np.random.normal(mean, sigma, img.shape) #Creates the noise. A mean of 0 means that the entire image is not made brighter or darker. Higher the SD wider is the curve and thus more intense will be the noise.
+            noisy = img.astype(np.float32) + noise #Adds the noise to the image. Here cannot convert noise directly as unit and add since noise has negative values as well. So do both using int.
+            return np.clip(noisy, 0, 255).astype(np.uint8) #Then clip negatives to 0 and convert to uint.
+        
+        def add_salt_pepper(img, prob=0.01):  #Greater prob means more of the pixels are turned into noise
+            output = img.copy()
+            rnd = np.random.rand(*img.shape[:2])  #Unpacks the shape tuple and returns a random array of same shape as image with integers between 0.0 and 1.0 representing probabilities
+            output[rnd < prob/2] = 0       # pepper
+            output[rnd > 1 - prob/2] = 255 # salt
+            return output
+        
+        def random_crop(img, crop_h, crop_w):
+            h, w = img.shape[:2]
+            y = np.random.randint(0, h - crop_h + 1) #Selects a random row from 0(top row) to h-crop_h+1. This is done so that the range is withing limits and +1 is because randint include both upper and lower bounds.
+            x = np.random.randint(0, w - crop_w + 1)
+            return img[y:y+crop_h, x:x+crop_w]
+        
+        def augment_image(img, methods=["flip_h", "flip_v", "rotate", "brightness", "contrast", "gaussian", "salt_pepper"]):
+            augmented = []
+        
+            for method in methods:
+                if method == "flip_h":
+                    augmented.append(flip_horizontal(img))
+                elif method == "flip_v":
+                    augmented.append(flip_vertical(img))
+                elif method == "rotate":
+                    augmented.append(rotate_90(img))  # rotate 90°
+                elif method == "brightness":
+                    augmented.append(adjust_brightness(img, value=50))
+                elif method == "contrast":
+                    augmented.append(adjust_contrast(img, factor=1.2))
+                elif method == "gaussian":
+                    augmented.append(add_gaussian_noise(img, sigma=25))
+                elif method == "salt_pepper":
+                    augmented.append(add_salt_pepper(img, prob=0.01))
+        
+            return augmented
 
     
 
