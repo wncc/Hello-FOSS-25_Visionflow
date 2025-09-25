@@ -171,8 +171,46 @@ def preprocess_image(img_path, size=(64,64), normalize = True, augment = False, 
             y = np.random.randint(0, h - crop_h + 1) #Selects a random row from 0(top row) to h-crop_h+1. This is done so that the range is withing limits and +1 is because randint include both upper and lower bounds.
             x = np.random.randint(0, w - crop_w + 1)
             return img[y:y+crop_h, x:x+crop_w]
+
+        def rotate_image(img, angle):  #Suppose angle is in degrees
+            # Convert angle to radians
+            theta = np.deg2rad(angle)
         
-        def augment_image(img, methods=["flip_h", "flip_v", "rotate", "brightness", "contrast", "gaussian", "salt_pepper"]):
+            # Get image shape
+            h, w = img.shape[:2]
+            # Center of the image
+            cx, cy = w // 2, h // 2    #The image rotates about center. So we will define the center as orgin
+        
+            # Create output image
+            rotated = np.zeros_like(img)
+        
+            # Precompute sin and cos
+            cos_theta, sin_theta = np.cos(theta), np.sin(theta)
+        
+            # For each pixel in the output
+            for i in range(h):
+                for j in range(w):
+                    # Coordinates relative to center. Initially, the origin is the top left corner. We now define our new origin as center so we get new cordinates for each pixel.
+                    x = j - cx  #The column or width
+                    y = i - cy   #The row or height
+                    # Rotate. For this, take any pixel i,j in the new image. We should find what image from the source is getting used. So we find the x and y cordinates of this pixel in the original image.
+                    #Suppose a point is rotated by theta due to rotation of axes. Then the new cordinates of the point is given by xcos(theta)-ysin(theta), xsin(theta)+ycos(theta)
+                    #And the original points are given by, xcos(theta)+ysin(theta), -xsin(theta)+ycos(theta)
+                    #So we find the location of these original points. And then shift back to the original cordinate system.
+                    x_new = int(cos_theta * x + sin_theta * y + cx)
+                    y_new = int(-sin_theta * x + cos_theta * y + cy)
+                    # Assign pixel if inside bounds
+                    if 0 <= x_new < w and 0 <= y_new < h:
+                        rotated[i, j] = img[y_new, x_new]
+            return rotated
+        
+        def random_rotate(img, max_angle=30):
+            angle = np.random.uniform(-max_angle, max_angle)
+            return rotate_image(img, angle)
+        
+        # Pipeline that comines all augmenation functions
+        
+        def augment_image(img, methods=["flip_h", "flip_v", "random_rotate", "brightness", "contrast", "gaussian", "salt_pepper"]):
             augmented = []
         
             for method in methods:
@@ -180,8 +218,8 @@ def preprocess_image(img_path, size=(64,64), normalize = True, augment = False, 
                     augmented.append(flip_horizontal(img))
                 elif method == "flip_v":
                     augmented.append(flip_vertical(img))
-                elif method == "rotate":
-                    augmented.append(rotate_90(img))  # rotate 90°
+                elif method == "random_rotate":
+                    augmented.append(random_rotate(img, max_angle=30))  # rotate a random angle between -30 and 30
                 elif method == "brightness":
                     augmented.append(adjust_brightness(img, value=50))
                 elif method == "contrast":
