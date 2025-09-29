@@ -4,61 +4,41 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras import datasets
 import os
 
-# Import all your custom preprocessing functions from the other file
-from preprocess.py import (
-    load_image,
+# Import only the functions we need now
+from image_utils import (
     resize,
-    grayscale,
     normalize_img,
-    median_filter,
-    gaussian_blur,
-    flip_horizontal,
-    adjust_brightness,
-    adjust_contrast,
-    add_gaussian_noise,
-    add_salt_pepper
+    preprocess_image # Import the main pipeline function
 )
 
 # --- Configuration ---
 MODEL_PATH = 'cifar10_model.h5'
 
-def evaluate_transformation(model, x_test, y_test, function, description, **kwargs):
+def evaluate_pipeline(model, x_test, y_test, description, **pipeline_kwargs):
     """
-    Applies a specific transformation to the test set and evaluates the model's performance.
-
+    Evaluates the model's performance using the full preprocess_image pipeline.
+    
     Args:
         model: The trained Keras model.
-        x_test: The original test images.
-        y_test: The original test labels.
-        function: The image processing function to apply.
-        description (str): A description of the transformation for printing.
-        **kwargs: Additional arguments to pass to the transformation function.
+        x_test: Original test images.
+        y_test: Original test labels.
+        description (str): A description of the pipeline being tested.
+        **pipeline_kwargs: The arguments to pass to the preprocess_image function.
     """
-    print(f"\n--- Evaluating: {description} ---")
+    print(f"\n--- Evaluating Pipeline: {description} ---")
 
-    # Apply the transformation to a copy of the test images
-    x_test_transformed = x_test.copy()
+    # The preprocess_image function handles resizing and normalization internally.
+    # We must ensure the final output is normalized for the model.
+    pipeline_kwargs['normalize'] = True
+    pipeline_kwargs['size'] = (64, 64)
     
-    # Process each image with the specified function
-    processed_images = []
-    for img in x_test_transformed:
-        # The core logic: apply the function
-        transformed_img = function(img, **kwargs)
-        
-        # We must always resize and normalize to match the model's expected input
-        resized_img = resize(transformed_img, 64, 64)
-
-        # Handle grayscale images that need 3 channels for the model
-        if resized_img.ndim == 2:
-            resized_img = np.stack([resized_img] * 3, axis=-1)
-            
-        normalized_img = normalize_img(resized_img, new_min=0, new_max=1) # Normalize to [0,1]
-        processed_images.append(normalized_img)
+    processed_images = [preprocess_image(img, **pipeline_kwargs) for img in x_test]
 
     # Evaluate the model
     loss, accuracy = model.evaluate(np.array(processed_images), y_test, verbose=0)
     print(f"  -> Accuracy: {accuracy:.4f}")
     return accuracy
+
 
 def main():
     """Main function to run the evaluation."""
@@ -76,20 +56,44 @@ def main():
     # --- 2. Evaluate Baseline Performance ---
     # The baseline is performance on data processed exactly like the validation set in training
     print("\n--- Evaluating: Baseline (Resize + Normalize) ---")
+    # We still need resize and normalize_img for the baseline comparison
     x_test_baseline = np.array([normalize_img(resize(img, 64, 64), 0, 1) for img in x_test])
     baseline_loss, baseline_acc = model.evaluate(x_test_baseline, y_test, verbose=0)
     print(f"  -> Baseline Accuracy: {baseline_acc:.4f}")
 
-    # --- 3. Evaluate Each Transformation ---
-    # Now, we test each of your functions individually.
-    evaluate_transformation(model, x_test, y_test, grayscale, "Grayscale")
-    evaluate_transformation(model, x_test, y_test, median_filter, "Median Filter", ksize=3)
-    evaluate_transformation(model, x_test, y_test, gaussian_blur, "Gaussian Blur", sigma=1)
-    evaluate_transformation(model, x_test, y_test, adjust_brightness, "Brightness (+50)", value=50)
-    evaluate_transformation(model, x_test, y_test, adjust_contrast, "Contrast (x1.5)", factor=1.5)
-    evaluate_transformation(model, x_test, y_test, add_gaussian_noise, "Gaussian Noise (sigma=25)", sigma=25)
-    evaluate_transformation(model, x_test, y_test, add_salt_pepper, "Salt & Pepper Noise", prob=0.02)
-    evaluate_transformation(model, x_test, y_test, flip_horizontal, "Horizontal Flip")
+    # --- 3. Evaluate Full preprocess_image Pipelines ---
+    # This section now contains all our evaluation tests.
+    evaluate_pipeline(
+        model, x_test, y_test,
+        description="Just Augmentation",
+        pipeline_kwargs={'augment': True}
+    )
+
+    evaluate_pipeline(
+        model, x_test, y_test,
+        description="Just Grayscale",
+        pipeline_kwargs={'to_grayscale': True}
+    )
+
+    evaluate_pipeline(
+        model, x_test, y_test,
+        description="Just Median Filter",
+        pipeline_kwargs={'noise_reduction': 'median'}
+    )
+
+    evaluate_pipeline(
+        model, x_test, y_test,
+        description="Grayscale with Median Filter",
+        pipeline_kwargs={'to_grayscale': True, 'noise_reduction': 'median'}
+    )
+    
+    evaluate_pipeline(
+        model, x_test, y_test,
+        description="Gaussian Blur with Augmentation",
+        pipeline_kwargs={'noise_reduction': 'gaussian', 'augment': True}
+    )
+
 
 if __name__ == '__main__':
     main()
+
