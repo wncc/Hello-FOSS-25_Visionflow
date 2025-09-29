@@ -101,3 +101,30 @@ class ClassificationPipeline:
         
         print("\n🎉 Pipeline execution finished successfully!")
         return history
+
+# ==============================================================================
+# EXAMPLE USAGE (how a user would run your package)
+# ==============================================================================
+if __name__ == '__main__':
+    # --- Create dummy data for a self-contained demonstration ---
+    DUMMY_DATA_PATH = "temp_data_pipeline"
+    os.makedirs(os.path.join(DUMMY_DATA_PATH, "cats"), exist_ok=True)
+    os.makedirs(os.path.join(DUMMY_DATA_PATH, "dogs"), exist_ok=True)
+    for i in range(50): # Create 50 dummy images per class for a decent split
+        tf.keras.utils.save_img(f"{DUMMY_DATA_PATH}/cats/cat{i}.jpg", np.random.rand(100, 100, 3) * 255)
+        tf.keras.utils.save_img(f"{DUMMY_DATA_PATH}/dogs/dog{i}.jpg", np.random.rand(100, 100, 3) * 255)
+
+    # 1. This is what a user would configure for their experiment
+    experiment_config = {
+        "data_path": DUMMY_DATA_PATH,
+        "model_name": "MobileNetV2",
+        "img_size": (128, 128),
+        "epochs": 3, 
+        "batch_size": 8,
+        "learning_rate": 0.001,
+        "checkpoint_path": "checkpoints/best_model.keras"
+    }
+
+    # 2. The user creates and runs the pipeline
+    pipeline = ClassificationPipeline(config=experiment_config)
+    pipeline.run()
