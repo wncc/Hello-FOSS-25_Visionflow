@@ -1,80 +1,158 @@
 import tensorflow as tf
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix, classification_report as sk_classification_report
+import os
 
-def decode_predictions(raw_predictions, class_names):
+# ==============================================================================
+# Prediction and Metric Functions (TensorFlow/Keras Version)
+# ==============================================================================
+
+def get_predictions(model: tf.keras.Model, dataset: tf.data.Dataset):
     """
-    Converts raw model outputs (logits) into class names and confidences.
+    Run inference on a dataset and return predictions and ground truth labels.
 
     Args:
-        raw_predictions (np.array): The raw output from the model for a batch of images.
-        class_names (list): A list of strings representing the class names.
+        model (tf.keras.Model): The trained Keras model.
+        dataset (tf.data.Dataset): A dataset yielding (images, labels) batches.
 
     Returns:
-        tuple: A tuple containing:
-            - list: The predicted class names for each image.
-            - list: The confidence scores for each prediction.
+        tuple: A tuple containing (predicted_indices, true_labels).
     """
-    # Use softmax to convert the raw logits into a probability distribution
-    probabilities = tf.nn.softmax(raw_predictions).numpy()
-    
-    # Find the index of the class with the highest probability for each prediction
-    predicted_indices = np.argmax(probabilities, axis=1)
-    
-    # Get the confidence scores (the highest probability) and corresponding class names
-    confidences = np.max(probabilities, axis=1)
-    predicted_class_names = [class_names[i] for i in predicted_indices]
-    
-    return predicted_class_names, confidences
+    model.evaluate # Ensure model is in inference mode
+    all_preds = []
+    all_labels = []
 
-def plot_confusion_matrix(y_true, y_pred, class_names):
+    for images, labels in dataset:
+        raw_preds = model.predict(images, verbose=0)
+        predicted_indices = np.argmax(raw_preds, axis=1)
+        all_preds.extend(predicted_indices)
+        all_labels.extend(labels.numpy())
+
+    return all_preds, all_labels
+
+def predict_single(model: tf.keras.Model, image: np.ndarray, class_names: list = None):
     """
-    Generates, plots, and displays a confusion matrix to evaluate model accuracy.
-    
+    Predict a class for a single image.
 
     Args:
-        y_true (list): The ground truth labels.
-        y_pred (list): The labels predicted by the model.
-        class_names (list): A list of all possible class names for labeling the axes.
+        model (tf.keras.Model): The trained Keras model.
+        image (np.ndarray): A single image array (H, W, C).
+        class_names (list, optional): A list to map the output index to a class name.
+
+    Returns:
+        str or int: The predicted class name or index.
     """
+    # Add a batch dimension and get prediction
+    image_batch = np.expand_dims(image, axis=0)
+    raw_pred = model.predict(image_batch, verbose=0)[0]
+    pred_idx = np.argmax(raw_pred)
+
+    if class_names:
+        return class_names[pred_idx]
+    return pred_idx
+
+def predict_batch(model: tf.keras.Model, images: np.ndarray, class_names: list = None):
+    """
+    Predict classes for a batch of images.
+
+    Args:
+        model (tf.keras.Model): The trained Keras model.
+        images (np.ndarray): A batch of images (B, H, W, C).
+        class_names (list, optional): A list to map output indices to class names.
+
+    Returns:
+        list: A list of predicted class names or indices.
+    """
+    raw_preds = model.predict(images, verbose=0)
+    pred_indices = np.argmax(raw_preds, axis=1)
+
+    if class_names:
+        return [class_names[i] for i in pred_indices]
+    return list(pred_indices)
+
+
+def compute_accuracy(y_true, y_pred):
+    """Computes classification accuracy from lists or arrays."""
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    correct = np.sum(y_true == y_pred)
+    return correct / len(y_true)
+
+
+def classification_report(y_true, y_pred, class_names=None):
+    """Generate a precision/recall/F1 report using scikit-learn."""
+    return sk_classification_report(y_true, y_pred, target_names=class_names)
+
+# ==============================================================================
+# Visualization and Export Functions
+# ==============================================================================
+
+def plot_confusion_matrix(y_true, y_pred, class_names, figsize=(10,8), cmap="Blues"):
+    """Plots and displays a confusion matrix."""
     cm = confusion_matrix(y_true, y_pred, labels=class_names)
-    plt.figure(figsize=(10, 8))
-    
-    sns.heatmap(
-        cm, 
-        annot=True, 
-        fmt='d', 
-        xticklabels=class_names, 
-        yticklabels=class_names, 
-        cmap='Blues'
-    )
-    
-    plt.xlabel("Predicted Label")
-    plt.ylabel("True Label")
+    plt.figure(figsize=figsize)
+    sns.heatmap(cm, annot=True, fmt="d", cmap=cmap, 
+                xticklabels=class_names, yticklabels=class_names)
+    plt.ylabel("Actual")
+    plt.xlabel("Predicted")
     plt.title("Confusion Matrix")
     plt.show()
 
-def display_prediction(image, true_label, predicted_label, confidence):
+def plot_sample_predictions(images, preds, labels=None, class_names=None, n=6):
     """
-    Displays a single image with its true and predicted labels.
-
-    The title is colored green for a correct prediction and red for an incorrect one.
-
-    Args:
-        image (np.array): The image to display (should be in [0, 1] range).
-        true_label (str): The correct label for the image.
-        predicted_label (str): The model's predicted label.
-        confidence (float): The model's confidence in the prediction.
+    Plot a batch of images with predicted (and optionally true) labels.
     """
-    plt.imshow(image)
-    
-    title_color = 'green' if true_label == predicted_label else 'red'
-    
-    plt.title(
-        f"True: {true_label}\nPredicted: {predicted_label} ({confidence:.2f})",
-        color=title_color
-    )
-    plt.axis('off')
+    images = images[:n]
+    preds = preds[:n]
+    if labels is not None:
+        labels = labels[:n]
+
+    plt.figure(figsize=(15, 5))
+    for i in range(len(images)):
+        plt.subplot(1, n, i + 1)
+        plt.imshow(images[i]) # Assumes images are in a displayable format (e.g., [0,1] or [0,255])
+        plt.axis("off")
+        
+        # Get prediction name
+        pred_name = class_names[preds[i]] if class_names else preds[i]
+        title = f"Pred: {pred_name}"
+
+        if labels is not None:
+            true_name = class_names[labels[i]] if class_names else labels[i]
+            title += f"\nTrue: {true_name}"
+            if pred_name == true_name:
+                plt.title(title, color="green")
+            else:
+                plt.title(title, color="red")
+        else:
+            plt.title(title)
+            
     plt.show()
+
+def save_predictions_to_csv(preds, filename="predictions.csv", class_names=None):
+    """Saves predictions to a CSV file."""
+    if class_names:
+        preds = [class_names[p] for p in preds]
+
+    df = pd.DataFrame({"prediction": preds})
+    df.to_csv(filename, index=False)
+    print(f"✅ Saved predictions to {filename}")
+
+
+def save_annotated_images(images, preds, out_dir="./results", class_names=None):
+    """Saves images to disk with their predicted labels as titles."""
+    os.makedirs(out_dir, exist_ok=True)
+
+    for i, img in enumerate(images):
+        plt.imshow(img)
+        plt.axis("off")
+        pred_name = class_names[preds[i]] if class_names else preds[i]
+        plt.title(f"Pred: {pred_name}")
+        plt.savefig(os.path.join(out_dir, f"sample_{i}.png"))
+        plt.close()
+
+    print(f"✅ Saved annotated images to {out_dir}")
+
