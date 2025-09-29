@@ -43,8 +43,8 @@ def normalize_img(img, new_min=0.0, new_max=1.0):
     return img_norm.astype(np.float32)
 
 def median_filter(img, ksize=3):
-    # This function expects a 2D or 3D image and will be slow with loops
     pad = ksize // 2
+    # Correct padding for a 3-channel color image
     padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
     out = np.zeros_like(img, dtype=np.float32)
     for i in range(img.shape[0]):
@@ -55,9 +55,28 @@ def median_filter(img, ksize=3):
                  out[i, j, c] = np.median(region[:,:,c])
     return out.astype(img.dtype)
 
-# ... (and so on for all your other custom functions like flip, rotate, etc.)
 def flip_horizontal(img):
     return img[:, ::-1]
+
+# --- NEWLY ADDED FUNCTIONS ---
+def Gaussian_kernel(ksize, sigma):
+    ax = np.linspace(-(ksize // 2), ksize // 2, ksize)
+    xx, yy = np.meshgrid(ax, ax)
+    kernel = np.exp(-(xx**2 + yy**2) / (2 * sigma**2))
+    return kernel / np.sum(kernel)
+
+def Gaussian_blur(img, sigma, ksize = 3):
+    kernel = Gaussian_kernel(ksize, sigma)
+    pad = ksize // 2
+    # Correct padding for a 3-channel color image
+    padded_img = np.pad(img, ((pad, pad), (pad, pad), (0,0)), mode='reflect')
+    out = np.zeros_like(img, dtype=np.float32)
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            region = padded_img[i:i+ksize, j:j+ksize]
+            # Broadcasting will apply the 2D kernel to each of the 3 color channels
+            out[i, j] = np.sum(region * kernel[:, :, np.newaxis], axis=(0,1))
+    return out.astype(img.dtype)
 
 # ==============================================================================
 # The New, Configurable Preprocessor Class
@@ -75,27 +94,28 @@ class Preprocessor:
         The main processing function that will be wrapped by tf.py_function.
         It takes a file path, loads the image, and applies transformations.
         """
-        # Decode the tensor to a string
         image_path = image_path_tensor.numpy().decode('utf-8')
-        
-        # Load the image using your function
         img = load_image(image_path)
 
-        # Apply transformations sequentially based on the config
         if "resize" in self.config:
             params = self.config["resize"]
             img = resize(img, new_height=params["height"], new_width=params["width"])
 
         if self.config.get("grayscale", False):
             img = grayscale(img)
-            # Ensure it still has 3 channels if the model expects it
             img = np.stack([img]*3, axis=-1)
 
         if "median_filter" in self.config:
-            img = median_filter(img, ksize=self.config["median_filter"].get("ksize", 3))
+            params = self.config["median_filter"]
+            img = median_filter(img, ksize=params.get("ksize", 3))
+        
+        # --- LOGIC FOR GAUSSIAN BLUR ---
+        if "gaussian_blur" in self.config:
+            params = self.config["gaussian_blur"]
+            img = Gaussian_blur(img, ksize=params.get("ksize", 3), sigma=params.get("sigma", 1.0))
 
-        if "flip_horizontal" in self.config and self.config["flip_horizontal"]:
-             if np.random.rand() > 0.5: # Apply augmentation randomly
+        if self.config.get("flip_horizontal", False):
+             if np.random.rand() > 0.5:
                 img = flip_horizontal(img)
 
         if self.config.get("normalize", False):
@@ -122,31 +142,23 @@ def create_dataset_from_directory(data_path: str, batch_size: int, preprocessor:
             filepaths.append(os.path.join(class_dir, filename))
             labels.append(class_map[class_name])
 
-    # 1. Create a dataset of file paths and labels
     dataset = tf.data.Dataset.from_tensor_slices((filepaths, labels))
     dataset = dataset.shuffle(buffer_size=len(filepaths))
 
-    # 2. Use `tf.py_function` to wrap your custom processing logic
     def apply_custom_preprocessing(path, label):
-        # Define the output shape and type for TensorFlow
         img_h = preprocessor.config["resize"]["height"]
         img_w = preprocessor.config["resize"]["width"]
         
-        # The wrapped function takes a tensor, so we call the preprocessor's method
         image = tf.py_function(func=preprocessor.process, inp=[path], Tout=tf.float32)
         
-        # Set the shape explicitly, which is required after py_function
         image.set_shape((img_h, img_w, 3))
         return image, label
 
-    # 3. Map the wrapped function across the dataset
     dataset = dataset.map(apply_custom_preprocessing, num_parallel_calls=tf.data.AUTOTUNE)
     
-    # 4. Batch and prefetch for performance
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
     print(f"✅ Dataset created using your custom NumPy/OpenCV preprocessor.")
     return dataset
-
 
