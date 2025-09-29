@@ -250,13 +250,13 @@ def preprocess_image(img,size=(64, 64),to_grayscale=False,noise_reduction=None, 
     """
     # --- Step 1: Resizing (almost always the first step) ---
     if size:
-        img = resize_fast(img, width=size[0], height=size[1])
+        img = resize(img, width=size[0], height=size[1])
 
     # --- Step 2: Optional Noise Reduction ---
     if noise_reduction == 'median':
-        img = median_filter_fast(img, ksize=3)
+        img = median_filter(img, ksize=3)
     elif noise_reduction == 'gaussian':
-        img = gaussian_blur_fast(img, ksize=5)
+        img = gaussian_blur(img, ksize=5)
 
     # --- Step 3: Optional Augmentation ---
     if augment:
@@ -272,7 +272,7 @@ def preprocess_image(img,size=(64, 64),to_grayscale=False,noise_reduction=None, 
 
     # --- Step 4: Optional Grayscale Conversion ---
     if to_grayscale:
-        img = grayscale_fast(img)
+        img = grayscale(img)
         # If model requires 3 channels, stack grayscale channel 3 times
         # img = np.stack([img]*3, axis=-1)
 
