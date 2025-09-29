@@ -3,45 +3,60 @@ import cv2
 import numpy as np
 import os
 
-# --- Optimized Helper Functions ---
+# ==============================================================================
+# All of your custom, from-scratch image processing functions
+# ==============================================================================
 
 def load_image(path):
-    """Loads an image and converts it from BGR (OpenCV default) to RGB."""
     img = cv2.imread(path)
-    if img is not None:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    # OpenCV loads in BGR, convert to RGB for consistency with other libraries
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
-def resize(img, new_height, new_width, interpolation=cv2.INTER_LINEAR):
-    """Efficiently resizes an image using OpenCV."""
-    # Note: OpenCV's resize expects the size as a (width, height) tuple.
-    return cv2.resize(img, (new_width, new_height), interpolation=interpolation)
+def resize(img, new_height, new_width):
+    # This is your slow implementation. As you noted, it should be optimized later.
+    resized_image = np.zeros((new_height, new_width, img.shape[2]), dtype=img.dtype)
+    original_height, original_width = img.shape[:2]
+    height_ratio = original_height / new_height
+    width_ratio = original_width / new_width
+    for i in range(new_height):
+        for j in range(new_width):
+            x = int(i * height_ratio)
+            y = int(j * width_ratio)
+            resized_image[i, j] = img[x, y]
+    return resized_image
 
 def grayscale(img):
-    """Efficiently converts an image to grayscale using OpenCV."""
-    return cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    height, width = img.shape[:2]
+    gray_img = np.zeros((height, width), dtype=np.float32)
+    for i in range(height):
+        for j in range(width):
+            # Using standard RGB channel order
+            R, G, B = img[i, j]
+            gray_value = 0.2989 * R + 0.5870 * G + 0.1140 * B
+            gray_img[i, j] = gray_value
+    return gray_img
 
 def normalize_img(img, new_min=0.0, new_max=1.0):
-    """Efficiently normalizes an image using NumPy's vectorized operations."""
     old_min, old_max = img.min(), img.max()
-    # Handle the edge case where max equals min to avoid division by zero
-    if old_max == old_min:
-        return np.full(img.shape, new_min, dtype=np.float32)
-    
-    img_norm = (img - old_min) * (new_max - new_min) / (old_max - old_min) + new_min
+    img_norm = (img - old_min) * (new_max - new_min) / (old_max - old_min + 1e-8) + new_min
     return img_norm.astype(np.float32)
 
 def median_filter(img, ksize=3):
-    """Applies a median filter using OpenCV."""
-    # Ensure the kernel size is odd, as required by the function
-    if ksize % 2 == 0:
-        raise ValueError("Kernel size for median filter must be odd.")
-    
-    # cv2.medianBlur handles each channel of a color image automatically.
-    return cv2.medianBlur(img, ksize)
+    # This function expects a 2D or 3D image and will be slow with loops
+    pad = ksize // 2
+    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
+    out = np.zeros_like(img, dtype=np.float32)
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            region = padded_img[i:i+ksize, j:j+ksize]
+            # Median for each channel
+            for c in range(img.shape[2]):
+                 out[i, j, c] = np.median(region[:,:,c])
+    return out.astype(img.dtype)
 
+# ... (and so on for all your other custom functions like flip, rotate, etc.)
 def flip_horizontal(img):
-    """This function is already efficient as it uses NumPy's slicing."""
     return img[:, ::-1]
 
 # ==============================================================================
@@ -133,3 +148,5 @@ def create_dataset_from_directory(data_path: str, batch_size: int, preprocessor:
 
     print(f"✅ Dataset created using your custom NumPy/OpenCV preprocessor.")
     return dataset
+
+
