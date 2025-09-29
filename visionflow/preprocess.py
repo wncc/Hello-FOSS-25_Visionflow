@@ -2,9 +2,10 @@ import tensorflow as tf
 import cv2
 import numpy as np
 import os
+from . import augmentation # <-- IMPORT THE NEW AUGMENTATION MODULE
 
 # ==============================================================================
-# All of your custom, from-scratch image processing functions
+# Your custom, from-scratch image processing functions (non-augmentation)
 # ==============================================================================
 
 def load_image(path):
@@ -55,10 +56,6 @@ def median_filter(img, ksize=3):
                  out[i, j, c] = np.median(region[:,:,c])
     return out.astype(img.dtype)
 
-def flip_horizontal(img):
-    return img[:, ::-1]
-
-# --- NEWLY ADDED FUNCTIONS ---
 def Gaussian_kernel(ksize, sigma):
     ax = np.linspace(-(ksize // 2), ksize // 2, ksize)
     xx, yy = np.meshgrid(ax, ax)
@@ -79,7 +76,7 @@ def Gaussian_blur(img, sigma, ksize = 3):
     return out.astype(img.dtype)
 
 # ==============================================================================
-# The New, Configurable Preprocessor Class
+# The Configurable Preprocessor Class (Updated)
 # ==============================================================================
 
 class Preprocessor:
@@ -92,7 +89,6 @@ class Preprocessor:
     def process(self, image_path_tensor):
         """
         The main processing function that will be wrapped by tf.py_function.
-        It takes a file path, loads the image, and applies transformations.
         """
         image_path = image_path_tensor.numpy().decode('utf-8')
         img = load_image(image_path)
@@ -101,22 +97,28 @@ class Preprocessor:
             params = self.config["resize"]
             img = resize(img, new_height=params["height"], new_width=params["width"])
 
-        if self.config.get("grayscale", False):
-            img = grayscale(img)
-            img = np.stack([img]*3, axis=-1)
+        # --- AUGMENTATION BLOCK (now calls functions from the augmentation module) ---
+        if self.config.get("flip_horizontal", False) and np.random.rand() > 0.5:
+            img = augmentation.flip_horizontal(img)
+        
+        if "adjust_brightness" in self.config:
+            params = self.config["adjust_brightness"]
+            value = np.random.randint(-params.get("value", 30), params.get("value", 30))
+            img = augmentation.adjust_brightness(img, value=value)
 
+        # --- FILTERING / OTHER OPS BLOCK ---
         if "median_filter" in self.config:
             params = self.config["median_filter"]
             img = median_filter(img, ksize=params.get("ksize", 3))
         
-        # --- LOGIC FOR GAUSSIAN BLUR ---
         if "gaussian_blur" in self.config:
             params = self.config["gaussian_blur"]
             img = Gaussian_blur(img, ksize=params.get("ksize", 3), sigma=params.get("sigma", 1.0))
 
-        if self.config.get("flip_horizontal", False):
-             if np.random.rand() > 0.5:
-                img = flip_horizontal(img)
+        # --- FINALIZATION BLOCK ---
+        if self.config.get("grayscale", False):
+            img = grayscale(img)
+            img = np.stack([img]*3, axis=-1)
 
         if self.config.get("normalize", False):
             img = normalize_img(img)
@@ -124,7 +126,7 @@ class Preprocessor:
         return img.astype(np.float32)
 
 # ==============================================================================
-# The Main Dataset Creation Function (Updated)
+# The Main Dataset Creation Function
 # ==============================================================================
 
 def create_dataset_from_directory(data_path: str, batch_size: int, preprocessor: Preprocessor):
