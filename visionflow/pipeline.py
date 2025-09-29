@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import os
 
-# --- 1. Import your project's modules (with new postprocessing functions) ---
+# --- 1. Import your project's modules ---
 from .preprocessing import Preprocessor, create_dataset_from_directory
 from .model_zoo import get_model
 from .trainer import Trainer
@@ -17,7 +17,7 @@ from .postprocessing import (
 )
 
 # ==============================================================================
-# The Main Pipeline Class (UPDATED)
+# The Main Pipeline Class (No changes needed here)
 # ==============================================================================
 
 class ClassificationPipeline:
@@ -26,10 +26,6 @@ class ClassificationPipeline:
     configurable preprocessor and generating a comprehensive evaluation report.
     """
     def __init__(self, config: dict):
-        """
-        Initializes the pipeline with a configuration dictionary.
-        The config MUST now contain a 'preprocessor' object.
-        """
         if "preprocessor" not in config:
             raise ValueError("Configuration must include a 'preprocessor' object.")
             
@@ -42,7 +38,6 @@ class ClassificationPipeline:
         print("✅ Pipeline initialized. Found classes:", self.class_names)
 
     def _prepare_datasets(self):
-        """Loads and splits data into training and validation sets using the preprocessor."""
         print("\n--- STAGE 1: Preparing Datasets ---")
         
         full_dataset = create_dataset_from_directory(
@@ -62,15 +57,10 @@ class ClassificationPipeline:
         return train_dataset, validation_dataset
 
     def run(self):
-        """
-        Executes the entire pipeline: data prep, training, and evaluation.
-        """
         print("\n🚀 Starting Visionflow Pipeline...")
         
-        # --- STAGE 1: PREPROCESSING ---
         train_ds, val_ds = self._prepare_datasets()
         
-        # --- STAGE 2: MODEL TRAINING ---
         print("\n--- STAGE 2: Model Training ---")
         model = get_model(
             model_name=self.config["model_name"],
@@ -81,35 +71,25 @@ class ClassificationPipeline:
         trainer = Trainer(model=model, config=self.config)
         history = trainer.train(train_ds, val_ds)
         
-        # --- STAGE 3: POSTPROCESSING & EVALUATION (Now more comprehensive) ---
         print("\n--- STAGE 3: Evaluating on Validation Data ---")
-        
-        # 3.1 Get all predictions and labels using the new helper function
         pred_indices, true_indices = get_predictions(model, val_ds)
         
-        # 3.2 Compute and print overall accuracy
         accuracy = compute_accuracy(true_indices, pred_indices)
         print(f"\nOverall Validation Accuracy: {accuracy:.4f}")
 
-        # 3.3 Print detailed classification report
         print("\n--- Classification Report ---")
         print(classification_report(true_indices, pred_indices, class_names=self.class_names))
         
-        # 3.4 Display Confusion Matrix
         print("\n--- Displaying Confusion Matrix ---")
-        # Convert indices to class names for plotting
         true_class_names = [self.class_names[i] for i in true_indices]
         pred_class_names = [self.class_names[i] for i in pred_indices]
         plot_confusion_matrix(true_class_names, pred_class_names, self.class_names)
         
-        # 3.5 Visualize some sample predictions
         print("\n--- Visualizing Sample Predictions ---")
-        # Get a single batch of images and labels to visualize
         sample_images, sample_labels = next(iter(val_ds))
         sample_preds = predict_batch(model, sample_images)
         plot_sample_predictions(sample_images, sample_preds, sample_labels.numpy(), self.class_names)
 
-        # 3.6 Save results to disk
         print("\n--- Saving Results to Disk ---")
         save_predictions_to_csv(pred_indices, class_names=self.class_names)
         save_annotated_images(sample_images, sample_preds, out_dir="./results", class_names=self.class_names)
@@ -118,7 +98,7 @@ class ClassificationPipeline:
         return history
 
 # ==============================================================================
-# EXAMPLE USAGE (how a user would run your package with the new system)
+# EXAMPLE USAGE (UPDATED to show new augmentation features)
 # ==============================================================================
 if __name__ == '__main__':
     # --- Create dummy data for a self-contained demonstration ---
@@ -129,16 +109,20 @@ if __name__ == '__main__':
         tf.keras.utils.save_img(f"{DUMMY_DATA_PATH}/cats/cat{i}.jpg", np.random.rand(100, 100, 3) * 255)
         tf.keras.utils.save_img(f"{DUMMY_DATA_PATH}/dogs/dog{i}.jpg", np.random.rand(100, 100, 3) * 255)
 
-    # 1. Define a custom preprocessing configuration
+    # 1. Define a custom preprocessing configuration that now includes augmentations
     my_preprocessor_config = {
         "resize": {"height": 128, "width": 128},
-        "normalize": True
+        "normalize": True,
+        # --- Demonstrate how to enable augmentations from the new module ---
+        "flip_horizontal": True, # This will be applied randomly
+        "adjust_brightness": {"value": 40}, # Randomly adjust brightness by +/- 40
+        "gaussian_blur": {"ksize": 3, "sigma": 1.0}
     }
 
     # 2. Create an instance of the Preprocessor
     custom_preprocessor = Preprocessor(config=my_preprocessor_config)
 
-    # 3. The main experiment config now includes the preprocessor object
+    # 3. The main experiment config includes the configured preprocessor object
     experiment_config = {
         "data_path": DUMMY_DATA_PATH,
         "model_name": "MobileNetV2",
