@@ -232,6 +232,56 @@ def augment_image(img, methods=["flip_h", "flip_v", "random_rotate", "brightness
 
     return augmented
 
+
+def preprocess_image(img,size=(64, 64),to_grayscale=False,noise_reduction=None, normalize=False,augment=False):
+    """
+    Applies a series of preprocessing steps to a single image.
+
+    Args:
+        img (np.array): The input image array.
+        size (tuple): The target (width, height) to resize the image to.
+        to_grayscale (bool): If True, converts the image to grayscale.
+        noise_reduction (str): Method for noise reduction. Can be 'median' or 'gaussian'.
+        normalize (bool): If True, scales pixel values to the [0, 1] range.
+        augment (bool): If True, applies a random selection of augmentations.
+
+    Returns:
+        np.array: The processed image.
+    """
+    # --- Step 1: Resizing (almost always the first step) ---
+    if size:
+        img = resize_fast(img, width=size[0], height=size[1])
+
+    # --- Step 2: Optional Noise Reduction ---
+    if noise_reduction == 'median':
+        img = median_filter_fast(img, ksize=3)
+    elif noise_reduction == 'gaussian':
+        img = gaussian_blur_fast(img, ksize=5)
+
+    # --- Step 3: Optional Augmentation ---
+    if augment:
+        # In a real pipeline, you apply a few augmentations randomly.
+        if np.random.rand() > 0.5:
+            img = flip_horizontal(img)
+        if np.random.rand() > 0.5:
+            img = adjust_brightness(img, value=np.random.randint(-30, 30))
+        if np.random.rand() > 0.5:
+            img = adjust_contrast(img, factor=np.random.uniform(0.8, 1.2))
+        if np.random.rand() > 0.5:
+            img = add_gaussian_noise(img, sigma=np.random.uniform(0, 20))
+
+    # --- Step 4: Optional Grayscale Conversion ---
+    if to_grayscale:
+        img = grayscale_fast(img)
+        # If model requires 3 channels, stack grayscale channel 3 times
+        # img = np.stack([img]*3, axis=-1)
+
+    # --- Step 5: Optional Normalization (usually the last step) ---
+    if normalize:
+        img = normalize_img(img)
+
+    return img
+
     
 
 
