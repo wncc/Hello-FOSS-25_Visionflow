@@ -6,9 +6,6 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report as sk_classification_report
 import os
 
-# ==============================================================================
-# Prediction and Metric Functions (TensorFlow/Keras Version)
-# ==============================================================================
 
 def get_predictions(model: tf.keras.Model, dataset: tf.data.Dataset):
     """
@@ -139,7 +136,7 @@ def save_predictions_to_csv(preds, filename="predictions.csv", class_names=None)
 
     df = pd.DataFrame({"prediction": preds})
     df.to_csv(filename, index=False)
-    print(f"✅ Saved predictions to {filename}")
+    print(f"Saved predictions to {filename}")
 
 
 def save_annotated_images(images, preds, out_dir="./results", class_names=None):
@@ -154,5 +151,5 @@ def save_annotated_images(images, preds, out_dir="./results", class_names=None):
         plt.savefig(os.path.join(out_dir, f"sample_{i}.png"))
         plt.close()
 
-    print(f"✅ Saved annotated images to {out_dir}")
+    print(f"Saved annotated images to {out_dir}")
 
