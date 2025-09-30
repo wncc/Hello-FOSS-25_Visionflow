@@ -2,11 +2,8 @@ import tensorflow as tf
 import cv2
 import numpy as np
 import os
-from . import augmentation # <-- IMPORT THE NEW AUGMENTATION MODULE
+from . import augmentation 
 
-# ==============================================================================
-# Your custom, from-scratch image processing functions (non-augmentation)
-# ==============================================================================
 
 def load_image(path):
     img = cv2.imread(path)
@@ -15,7 +12,7 @@ def load_image(path):
     return img
 
 def resize(img, new_height, new_width):
-    # This is your slow implementation. As you noted, it should be optimized later.
+    # This is very slow, needs to be optimized
     resized_image = np.zeros((new_height, new_width, img.shape[2]), dtype=img.dtype)
     original_height, original_width = img.shape[:2]
     height_ratio = original_height / new_height
@@ -28,6 +25,7 @@ def resize(img, new_height, new_width):
     return resized_image
 
 def grayscale(img):
+    #Need to optimize
     height, width = img.shape[:2]
     gray_img = np.zeros((height, width), dtype=np.float32)
     for i in range(height):
@@ -38,58 +36,52 @@ def grayscale(img):
             gray_img[i, j] = gray_value
     return gray_img
 
-def normalize_img(img, new_min=0.0, new_max=1.0):
-    old_min, old_max = img.min(), img.max()
-    img_norm = (img - old_min) * (new_max - new_min) / (old_max - old_min + 1e-8) + new_min
-    return img_norm.astype(np.float32)
+def normalize_img(img):
+    img = img.astype(np.float32)
+    return img / 255.0
 
+#taking median of its surrounding k*k box and updating
 def median_filter(img, ksize=3):
     pad = ksize // 2
-    # Correct padding for a 3-channel color image
+    #Only takes rgb images
+    #border edge cases are not handled
     padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
     out = np.zeros_like(img, dtype=np.float32)
     for i in range(img.shape[0]):
         for j in range(img.shape[1]):
             region = padded_img[i:i+ksize, j:j+ksize]
-            # Median for each channel
             for c in range(img.shape[2]):
                  out[i, j, c] = np.median(region[:,:,c])
     return out.astype(img.dtype)
 
+#creating gaussian kernel
 def Gaussian_kernel(ksize, sigma):
     ax = np.linspace(-(ksize // 2), ksize // 2, ksize)
     xx, yy = np.meshgrid(ax, ax)
     kernel = np.exp(-(xx**2 + yy**2) / (2 * sigma**2))
     return kernel / np.sum(kernel)
 
+#
 def Gaussian_blur(img, sigma, ksize = 3):
+    #Only takes rgb images
+    #border edge cases are not handled
     kernel = Gaussian_kernel(ksize, sigma)
     pad = ksize // 2
-    # Correct padding for a 3-channel color image
-    padded_img = np.pad(img, ((pad, pad), (pad, pad), (0,0)), mode='reflect')
+    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
     out = np.zeros_like(img, dtype=np.float32)
     for i in range(img.shape[0]):
         for j in range(img.shape[1]):
-            region = padded_img[i:i+ksize, j:j+ksize]
-            # Broadcasting will apply the 2D kernel to each of the 3 color channels
+            region = img[i:i+ksize, j:j+ksize]
             out[i, j] = np.sum(region * kernel[:, :, np.newaxis], axis=(0,1))
     return out.astype(img.dtype)
 
-# ==============================================================================
-# The Configurable Preprocessor Class (Updated)
-# ==============================================================================
 
 class Preprocessor:
-    """
-    Applies a sequence of custom preprocessing steps defined in a config.
-    """
+    # Let a user preprocess with custom configurations given by them 
     def __init__(self, config: dict):
         self.config = config
 
     def process(self, image_path_tensor):
-        """
-        The main processing function that will be wrapped by tf.py_function.
-        """
         image_path = image_path_tensor.numpy().decode('utf-8')
         img = load_image(image_path)
 
@@ -97,7 +89,6 @@ class Preprocessor:
             params = self.config["resize"]
             img = resize(img, new_height=params["height"], new_width=params["width"])
 
-        # --- AUGMENTATION BLOCK (now calls functions from the augmentation module) ---
         if self.config.get("flip_horizontal", False) and np.random.rand() > 0.5:
             img = augmentation.flip_horizontal(img)
         
@@ -106,7 +97,6 @@ class Preprocessor:
             value = np.random.randint(-params.get("value", 30), params.get("value", 30))
             img = augmentation.adjust_brightness(img, value=value)
 
-        # --- FILTERING / OTHER OPS BLOCK ---
         if "median_filter" in self.config:
             params = self.config["median_filter"]
             img = median_filter(img, ksize=params.get("ksize", 3))
@@ -115,7 +105,6 @@ class Preprocessor:
             params = self.config["gaussian_blur"]
             img = Gaussian_blur(img, ksize=params.get("ksize", 3), sigma=params.get("sigma", 1.0))
 
-        # --- FINALIZATION BLOCK ---
         if self.config.get("grayscale", False):
             img = grayscale(img)
             img = np.stack([img]*3, axis=-1)
@@ -125,14 +114,8 @@ class Preprocessor:
 
         return img.astype(np.float32)
 
-# ==============================================================================
-# The Main Dataset Creation Function
-# ==============================================================================
-
+#Create a dataset from a directory path with images already placed in folders. Eg- directory has 2 folders cats and dogs with images of each.
 def create_dataset_from_directory(data_path: str, batch_size: int, preprocessor: Preprocessor):
-    """
-    Builds a tf.data.Dataset pipeline using your custom Preprocessor.
-    """
     class_names = sorted([d for d in os.listdir(data_path) if os.path.isdir(os.path.join(data_path, d))])
     class_map = {name: i for i, name in enumerate(class_names)}
 
@@ -161,6 +144,6 @@ def create_dataset_from_directory(data_path: str, batch_size: int, preprocessor:
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
-    print(f"✅ Dataset created using your custom NumPy/OpenCV preprocessor.")
+    print(f"Dataset created using preprocessor.")
     return dataset
 
