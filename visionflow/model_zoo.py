@@ -4,24 +4,10 @@ import tensorflow as tf
 from tensorflow.keras import layers, models, applications
 
 def get_model(model_name: str, input_shape: tuple, num_classes: int, weights: str = "imagenet"):
+
     """
-    Creates a pre-trained model from Keras Applications with a new classification head.
-
-    This function supports transfer learning by loading a well-known architecture,
-    freezing its layers, and adding a new trainable output layer for your specific task.
-
-    Args:
-        model_name (str): The name of the model architecture (e.g., "MobileNetV2", "ResNet50").
-        input_shape (tuple): The shape of the input images (height, width, channels).
-        num_classes (int): The number of output classes for the new classification head.
-        weights (str): Weights to load for the base model. Can be "imagenet" (pre-trained) 
-                       or None (random initialization).
-
-    Returns:
-        tf.keras.Model: The constructed Keras model ready for training.
-        
-    Raises:
-        ValueError: If the provided model_name is not supported.
+    Choosing a pre-trained model from Keras Applications with a new classfication head.
+    Returns tf.Keras.Model
     """
     # A dictionary mapping user-friendly names to their Keras Application classes
     MODEL_APPLICATIONS = {
@@ -55,6 +41,6 @@ def get_model(model_name: str, input_shape: tuple, num_classes: int, weights: st
         layers.Dense(num_classes)          # The final output layer for our specific number of classes
     ])
 
-    print(f"✅ Successfully created model '{model_name}' with {num_classes} classes.")
+    print(f"Successfully created model '{model_name}' with {num_classes} classes.")
     return model
 
