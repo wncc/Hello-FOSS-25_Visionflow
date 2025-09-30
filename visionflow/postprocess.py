@@ -153,3 +153,49 @@ def save_annotated_images(images, preds, out_dir="./results", class_names=None):
 
     print(f"Saved annotated images to {out_dir}")
 
+
+class Postprocessor:
+    """
+    Postprocessing with custom config
+    """
+    def __init__(self, config: dict):
+        self.config = config
+
+    def run_report(self, model: tf.keras.Model, dataset: tf.data.Dataset, class_names: list):
+        
+        print("\n--- STAGE 3: Evaluating on Validation Data ---")
+
+        # This is a common step for most tasks, so we do it once.
+        pred_indices, true_indices = get_predictions(model, dataset)
+
+        if self.config.get("accuracy"):
+            accuracy = compute_accuracy(true_indices, pred_indices)
+            print(f"\nOverall Validation Accuracy: {accuracy:.4f}")
+
+        if self.config.get("classification_report"):
+            print("\n--- Classification Report ---")
+            report = classification_report(true_indices, pred_indices, class_names=class_names)
+            print(report)
+
+        if self.config.get("confusion_matrix"):
+            print("\n--- Displaying Confusion Matrix ---")
+            plot_confusion_matrix(true_indices, pred_indices, class_names)
+        
+        if "plot_samples" in self.config:
+            print("\n--- Visualizing Sample Predictions ---")
+            sample_images, sample_labels = next(iter(dataset))
+            sample_preds = predict_batch(model, sample_images)
+            n_samples = self.config["plot_samples"].get("n", 6)
+            plot_sample_predictions(sample_images, sample_preds, sample_labels.numpy(), class_names, n=n_samples)
+
+        if "save_csv" in self.config:
+            print("\n--- Saving Predictions to CSV ---")
+            save_predictions_to_csv(pred_indices, filename=self.config["save_csv"], class_names=class_names)
+
+        if "save_images" in self.config:
+            print("\n--- Saving Annotated Images ---")
+            sample_images, _ = next(iter(dataset))
+            sample_preds = predict_batch(model, sample_images)
+            save_annotated_images(sample_images, sample_preds, out_dir=self.config["save_images"], class_names=class_names)
+
+
