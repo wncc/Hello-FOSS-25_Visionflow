@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import os
 
-# --- 1. Import your project's modules ---
+#Importing all the modules
 from .preprocessing import Preprocessor, create_dataset_from_directory
 from .model_zoo import get_model
 from .trainer import Trainer
@@ -16,9 +16,6 @@ from .postprocessing import (
     save_annotated_images
 )
 
-# ==============================================================================
-# The Main Pipeline Class (No changes needed here)
-# ==============================================================================
 
 class ClassificationPipeline:
     """
@@ -35,17 +32,19 @@ class ClassificationPipeline:
         self.class_names = sorted([d for d in os.listdir(config["data_path"]) if os.path.isdir(os.path.join(config["data_path"], d))])
         self.config["num_classes"] = len(self.class_names)
         
-        print("✅ Pipeline initialized. Found classes:", self.class_names)
+        print("\n Pipeline initialized. Found classes:", self.class_names)
 
     def _prepare_datasets(self):
         print("\n--- STAGE 1: Preparing Datasets ---")
-        
+
+        #creating dataset from directory and preprocessing each image
         full_dataset = create_dataset_from_directory(
             data_path=self.config["data_path"],
             batch_size=self.config["batch_size"],
             preprocessor=self.preprocessor
         )
-        
+
+        #Taking 80% of the set for training set and the other validation set
         dataset_size = tf.data.experimental.cardinality(full_dataset).numpy()
         train_size = int(0.8 * dataset_size)
         
@@ -57,20 +56,24 @@ class ClassificationPipeline:
         return train_dataset, validation_dataset
 
     def run(self):
-        print("\n🚀 Starting Visionflow Pipeline...")
+        print("\n Starting Visionflow Pipeline...")
         
         train_ds, val_ds = self._prepare_datasets()
         
         print("\n--- STAGE 2: Model Training ---")
+
+        #get model from model.py
         model = get_model(
             model_name=self.config["model_name"],
             input_shape=(*self.preprocessor.config["resize"].values(), 3),
             num_classes=self.config["num_classes"]
         )
-        
+
+        #training model
         trainer = Trainer(model=model, config=self.config)
         history = trainer.train(train_ds, val_ds)
-        
+
+        #postprocessing
         print("\n--- STAGE 3: Evaluating on Validation Data ---")
         pred_indices, true_indices = get_predictions(model, val_ds)
         
@@ -94,7 +97,7 @@ class ClassificationPipeline:
         save_predictions_to_csv(pred_indices, class_names=self.class_names)
         save_annotated_images(sample_images, sample_preds, out_dir="./results", class_names=self.class_names)
         
-        print("\n🎉 Pipeline execution finished successfully!")
+        print("\n Pipeline execution finished successfully!")
         return history
 
 # ==============================================================================
@@ -113,9 +116,9 @@ if __name__ == '__main__':
     my_preprocessor_config = {
         "resize": {"height": 128, "width": 128},
         "normalize": True,
-        # --- Demonstrate how to enable augmentations from the new module ---
-        "flip_horizontal": True, # This will be applied randomly
-        "adjust_brightness": {"value": 40}, # Randomly adjust brightness by +/- 40
+        
+        "flip_horizontal": True, 
+        "adjust_brightness": {"value": 40}, 
         "gaussian_blur": {"ksize": 3, "sigma": 1.0}
     }
 
