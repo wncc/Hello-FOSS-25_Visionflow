@@ -4,7 +4,7 @@ import os
 
 #Importing all our modules
 from .preprocessing import Preprocessor, create_dataset_from_directory
-from .model_zoo import get_model
+from .models import get_model
 from .trainer import Trainer
 from .postprocessing import Postprocessor
 
