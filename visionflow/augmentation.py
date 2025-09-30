@@ -1,8 +1,6 @@
 import numpy as np
 
-# ==============================================================================
-# All of your custom, from-scratch image augmentation functions
-# ==============================================================================
+
 
 def flip_horizontal(img):
     """Flips an image horizontally."""
@@ -30,23 +28,22 @@ def rotate_image(img, angle):
     return rotated
 
 def adjust_brightness(img, value=50):
-    """Adjusts image brightness by adding a value to pixel intensities."""
-    # Cast to a larger integer type to prevent overflow before clipping
+    #Adjusts image brightness by adding a value to pixel intensities.
     return np.clip(img.astype(np.int16) + value, 0, 255).astype(np.uint8)
 
 def adjust_contrast(img, factor=1.2):
-    """Adjusts image contrast by multiplying pixel intensities by a factor."""
+    #Adjusts image contrast by multiplying pixel intensities by a factor.
     mean = img.mean()
     return np.clip((img - mean) * factor + mean, 0, 255).astype(np.uint8)
 
 def add_gaussian_noise(img, mean=0, sigma=25):
-    """Adds Gaussian noise to an image."""
+    #Adds Gaussian noise to an image.
     noise = np.random.normal(mean, sigma, img.shape)
     noisy = img.astype(np.float32) + noise
     return np.clip(noisy, 0, 255).astype(np.uint8)
 
 def add_salt_pepper(img, prob=0.01):
-    """Adds salt and pepper noise to an image."""
+    #Adds salt and pepper noise to an image.
     output = img.copy()
     rnd = np.random.rand(*img.shape[:2])
     output[rnd < prob / 2] = 0   # pepper
