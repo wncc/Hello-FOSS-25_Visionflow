@@ -4,91 +4,125 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+from typing import List, Optional, Tuple, Any, Dict
 
 
-def get_predictions(model: tf.keras.Model, dataset: tf.data.Dataset):
+def get_predictions(model: tf.keras.Model, dataset: tf.data.Dataset) -> Tuple[List[int], List[int]]:
     """
-    Run inference on a dataset and return predictions and ground truth labels.
+    Run inference on a dataset and return (predictions, ground_truths) as lists of indices.
     """
-    model.evaluate # Ensure model is in inference mode
     all_preds = []
     all_labels = []
 
     for images, labels in dataset:
+        # model.predict accepts tf.Tensor or numpy arrays
         raw_preds = model.predict(images, verbose=0)
         predicted_indices = np.argmax(raw_preds, axis=1)
-        all_preds.extend(predicted_indices)
-        all_labels.extend(labels.numpy())
+        all_preds.extend(predicted_indices.tolist())
+        # handle labels being tf.Tensor or numpy
+        if isinstance(labels, tf.Tensor):
+            labels_np = labels.numpy()
+        else:
+            labels_np = np.array(labels)
+        # If labels are one-hot, convert to indices
+        if labels_np.ndim > 1:
+            labels_np = np.argmax(labels_np, axis=1)
+        all_labels.extend(labels_np.tolist())
 
     return all_preds, all_labels
 
-def predict_single(model: tf.keras.Model, image: np.ndarray, class_names: list = None):
+
+def predict_single(model: tf.keras.Model, image: np.ndarray, class_names: Optional[List[str]] = None) -> Any:
     """
-    Predict a class for a single image.
+    Predict a class for a single image. Returns class index or name (if class_names provided).
     """
-    # Add a batch dimension and get prediction
-    image_batch = np.expand_dims(image, axis=0)
+    image_np = np.asarray(image)
+    image_batch = np.expand_dims(image_np, axis=0)
     raw_pred = model.predict(image_batch, verbose=0)[0]
-    pred_idx = np.argmax(raw_pred)
+    pred_idx = int(np.argmax(raw_pred))
 
     if class_names:
         return class_names[pred_idx]
     return pred_idx
 
-def predict_batch(model: tf.keras.Model, images: np.ndarray, class_names: list = None):
+
+def predict_batch(model: tf.keras.Model, images: np.ndarray, class_names: Optional[List[str]] = None) -> List[Any]:
     """
-    Predict classes for a batch of images.
+    Predict classes for a batch of images. Returns list of indices or names (if class_names provided).
     """
-    raw_preds = model.predict(images, verbose=0)
-    pred_indices = np.argmax(raw_preds, axis=1)
+    images_np = np.asarray(images)
+    raw_preds = model.predict(images_np, verbose=0)
+    pred_indices = np.argmax(raw_preds, axis=1).tolist()
 
     if class_names:
         return [class_names[i] for i in pred_indices]
-    return list(pred_indices)
+    return pred_indices
 
 
-def compute_accuracy(y_true, y_pred):
-    """Computes classification accuracy from lists or arrays."""
+def compute_accuracy(y_true, y_pred) -> float:
+    """Computes classification accuracy from lists or arrays. Returns 0.0 if empty."""
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
+    if len(y_true) == 0:
+        return 0.0
     correct = np.sum(y_true == y_pred)
-    return correct / len(y_true)
+    return float(correct) / len(y_true)
+
 
 def confusion_matrix(y_true, y_pred, num_classes):
+    
     cm = np.zeros((num_classes, num_classes), dtype=int)
     for t, p in zip(y_true, y_pred):
         cm[t, p] += 1
     return cm
 
-def classification_report(y_true, y_pred, class_names=None):
+
+def classification_report(y_true, y_pred, class_names: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
+    """
+    Generate precision, recall, F1-score, and support for each class.
+    """
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
-    classes = np.unique(np.concatenate((y_true, y_pred)))
-    n_classes = len(classes)
-    
-    cm = confusion_matrix_manual(y_true, y_pred, n_classes)
-    
+
+    # Decide label ordering: use provided class_names if they match labels, else infer
+    if class_names is not None:
+        labels = np.arange(len(class_names))
+        # if y_true/y_pred are strings or not 0..n-1, try to use class_names as label names
+        # We support both numeric label indices and string label names.
+        # If y_true contains strings, use class_names directly as labels.
+        if y_true.dtype.type is np.str_ or y_pred.dtype.type is np.str_:
+            labels = np.array(class_names)
+    else:
+        labels = np.unique(np.concatenate((y_true, y_pred)))
+
+    cm, labels = confusion_matrix(y_true, y_pred, labels=labels)
     report = {}
-    for i, cls in enumerate(classes):
-        tp = cm[i, i]
-        fp = cm[:, i].sum() - tp
-        fn = cm[i, :].sum() - tp
-        tn = cm.sum() - (tp + fp + fn)
+    for i, cls in enumerate(labels):
+        tp = int(cm[i, i])
+        fp = int(cm[:, i].sum() - tp)
+        fn = int(cm[i, :].sum() - tp)
+        support = int(cm[i, :].sum())
 
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+        f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
 
-        cls_name = class_names[i] if class_names else str(cls)
+        # label name to put in report
+        if class_names is not None and i < len(class_names):
+            cls_name = class_names[i]
+        else:
+            cls_name = str(cls)
+
         report[cls_name] = {
-            "precision": precision,
-            "recall": recall,
-            "f1-score": f1,
-            "support": cm[i, :].sum()
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1-score": float(f1),
+            "support": support
         }
-    
-    # Add overall accuracy
-    report["accuracy"] = np.trace(cm) / np.sum(cm)
+
+    # overall accuracy
+    overall_acc = float(np.trace(cm) / np.sum(cm)) if np.sum(cm) > 0 else 0.0
+    report["accuracy"] = overall_acc
     return report
 
 
@@ -96,38 +130,60 @@ def classification_report(y_true, y_pred, class_names=None):
 # Visualization and Export Functions
 # ==============================================================================
 
-def plot_confusion_matrix(y_true, y_pred, class_names, figsize=(10,8), cmap="Blues"):
-    """Plots and displays a confusion matrix."""
-    cm = confusion_matrix(y_true, y_pred, labels=class_names)
+def plot_confusion_matrix(y_true, y_pred, class_names: Optional[List[str]] = None, figsize=(10, 8), cmap="Blues"):
+    """Plots and displays a confusion matrix (rows = actual, cols = predicted)."""
+    cm, labels = confusion_matrix(y_true, y_pred, labels=class_names if class_names is not None else None)
+
     plt.figure(figsize=figsize)
-    sns.heatmap(cm, annot=True, fmt="d", cmap=cmap, 
-                xticklabels=class_names, yticklabels=class_names)
+    # if labels are numeric, convert to strings for ticklabels
+    ticklabels = [str(l) for l in labels]
+    sns.heatmap(cm, annot=True, fmt="d", cmap=cmap,
+                xticklabels=ticklabels, yticklabels=ticklabels)
     plt.ylabel("Actual")
     plt.xlabel("Predicted")
     plt.title("Confusion Matrix")
     plt.show()
 
-def plot_sample_predictions(images, preds, labels=None, class_names=None, n=6):
+
+def plot_sample_predictions(images, preds, labels=None, class_names: Optional[List[str]] = None, n: int = 6):
     """
     Plot a batch of images with predicted (and optionally true) labels.
+    images: tf.Tensor or np.ndarray of shape (B, H, W, C) or (B, H, W).
+    preds: list/array of indices or strings.
+    labels: optional list/array of true indices or strings.
     """
-    images = images[:n]
-    preds = preds[:n]
+    images_np = np.asarray(images)
+    preds_list = list(preds)
     if labels is not None:
-        labels = labels[:n]
+        labels_list = list(labels)
+    else:
+        labels_list = None
 
+    n = min(n, len(images_np), len(preds_list))
     plt.figure(figsize=(15, 5))
-    for i in range(len(images)):
+    for i in range(n):
         plt.subplot(1, n, i + 1)
-        plt.imshow(images[i]) # Assumes images are in a displayable format (e.g., [0,1] or [0,255])
+        img = images_np[i]
+        # if tensor images are in [0,1] floats or [0,255] ints, matplotlib will handle common cases
+        plt.imshow(img.astype(np.uint8) if img.dtype != np.float32 and img.dtype != np.float64 else img)
         plt.axis("off")
-        
-        # Get prediction name
-        pred_name = class_names[preds[i]] if class_names else preds[i]
+
+        # prediction name
+        pred_val = preds_list[i]
+        if class_names is not None and isinstance(pred_val, (int, np.integer)) and pred_val < len(class_names):
+            pred_name = class_names[int(pred_val)]
+        else:
+            pred_name = str(pred_val)
+
         title = f"Pred: {pred_name}"
 
-        if labels is not None:
-            true_name = class_names[labels[i]] if class_names else labels[i]
+        if labels_list is not None:
+            true_val = labels_list[i]
+            if class_names is not None and isinstance(true_val, (int, np.integer)) and true_val < len(class_names):
+                true_name = class_names[int(true_val)]
+            else:
+                true_name = str(true_val)
+
             title += f"\nTrue: {true_name}"
             if pred_name == true_name:
                 plt.title(title, color="green")
@@ -135,29 +191,37 @@ def plot_sample_predictions(images, preds, labels=None, class_names=None, n=6):
                 plt.title(title, color="red")
         else:
             plt.title(title)
-            
+
     plt.show()
 
-def save_predictions_to_csv(preds, filename="predictions.csv", class_names=None):
-    """Saves predictions to a CSV file."""
-    if class_names:
-        preds = [class_names[p] for p in preds]
 
-    df = pd.DataFrame({"prediction": preds})
+def save_predictions_to_csv(preds, filename: Optional[str] = "predictions.csv", class_names: Optional[List[str]] = None):
+    """Saves predictions to a CSV file."""
+    if filename is True or filename is None:
+        filename = "predictions.csv"
+    if class_names:
+        preds_to_save = [class_names[p] if isinstance(p, (int, np.integer)) else p for p in preds]
+    else:
+        preds_to_save = preds
+
+    df = pd.DataFrame({"prediction": preds_to_save})
     df.to_csv(filename, index=False)
     print(f"Saved predictions to {filename}")
 
 
-def save_annotated_images(images, preds, out_dir="./results", class_names=None):
+def save_annotated_images(images, preds, out_dir="./results", class_names: Optional[List[str]] = None):
     """Saves images to disk with their predicted labels as titles."""
+    images_np = np.asarray(images)
     os.makedirs(out_dir, exist_ok=True)
 
-    for i, img in enumerate(images):
-        plt.imshow(img)
+    for i, img in enumerate(images_np):
+        plt.figure()
+        plt.imshow(img.astype(np.uint8) if img.dtype != np.float32 and img.dtype != np.float64 else img)
         plt.axis("off")
-        pred_name = class_names[preds[i]] if class_names else preds[i]
+        pred_name = class_names[preds[i]] if (class_names and isinstance(preds[i], (int, np.integer)) and preds[i] < len(class_names)) else str(preds[i])
         plt.title(f"Pred: {pred_name}")
-        plt.savefig(os.path.join(out_dir, f"sample_{i}.png"))
+        save_path = os.path.join(out_dir, f"sample_{i}.png")
+        plt.savefig(save_path, bbox_inches="tight", pad_inches=0)
         plt.close()
 
     print(f"Saved annotated images to {out_dir}")
@@ -165,16 +229,22 @@ def save_annotated_images(images, preds, out_dir="./results", class_names=None):
 
 class Postprocessor:
     """
-    Postprocessing with custom config
+    Postprocessing with custom config.
+    config can include keys:
+      - "accuracy": True
+      - "classification_report": True
+      - "confusion_matrix": True
+      - "plot_samples": {"n": 6}
+      - "save_csv": "path/to/file.csv" or True
+      - "save_images": "path/to/out_dir" or True
     """
-    def __init__(self, config: dict):
+
+    def __init__(self, config: Dict[str, Any]):
         self.config = config
 
-    def run_report(self, model: tf.keras.Model, dataset: tf.data.Dataset, class_names: list):
-        
+    def run_report(self, model: tf.keras.Model, dataset: tf.data.Dataset, class_names: Optional[List[str]] = None):
         print("\n--- STAGE 3: Evaluating on Validation Data ---")
 
-        # This is a common step for most tasks, so we do it once.
         pred_indices, true_indices = get_predictions(model, dataset)
 
         if self.config.get("accuracy"):
@@ -184,35 +254,43 @@ class Postprocessor:
         if self.config.get("classification_report"):
             print("\n--- Classification Report ---")
             report = classification_report(true_indices, pred_indices, class_names=class_names)
+            # print per-class metrics (skip the "accuracy" key here for formatting)
             for cls, metrics in report.items():
-            print(f"{cls}: {metrics}")
-    
+                if cls == "accuracy":
+                    continue
+                print(f"{cls}: precision={metrics['precision']:.4f}, recall={metrics['recall']:.4f}, f1={metrics['f1-score']:.4f}, support={metrics['support']}")
+            print(f"Overall accuracy: {report.get('accuracy', 0.0):.4f}")
+
         if self.config.get("confusion_matrix"):
             print("\n--- Displaying Confusion Matrix ---")
-            cm = confusion_matrix(true_indices, pred_indices, len(class_names))
-            plt.figure(figsize=(8, 6))
-            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", 
-                xticklabels=class_names, yticklabels=class_names)
-            
-    plt.ylabel("Actual")
-    plt.xlabel("Predicted")
-    plt.title("Confusion Matrix")
-    plt.show()
+            plot_confusion_matrix(true_indices, pred_indices, class_names)
+
         if "plot_samples" in self.config:
             print("\n--- Visualizing Sample Predictions ---")
-            sample_images, sample_labels = next(iter(dataset))
-            sample_preds = predict_batch(model, sample_images)
-            n_samples = self.config["plot_samples"].get("n", 6)
-            plot_sample_predictions(sample_images, sample_preds, sample_labels.numpy(), class_names, n=n_samples)
+            try:
+                sample_images, sample_labels = next(iter(dataset))
+            except Exception as ex:
+                print(f"Could not fetch a batch from dataset for sample plotting: {ex}")
+                sample_images, sample_labels = None, None
+
+            if sample_images is not None:
+                sample_preds = predict_batch(model, sample_images)
+                n_samples = int(self.config["plot_samples"].get("n", 6)) if isinstance(self.config["plot_samples"], dict) else int(self.config["plot_samples"])
+                plot_sample_predictions(sample_images, sample_preds, sample_labels.numpy() if isinstance(sample_labels, tf.Tensor) else sample_labels, class_names, n=n_samples)
 
         if "save_csv" in self.config:
             print("\n--- Saving Predictions to CSV ---")
-            save_predictions_to_csv(pred_indices, filename=self.config["save_csv"], class_names=class_names)
+            filename = self.config.get("save_csv")
+            if filename is True or filename is None:
+                filename = "predictions.csv"
+            save_predictions_to_csv(pred_indices, filename=filename, class_names=class_names)
 
         if "save_images" in self.config:
             print("\n--- Saving Annotated Images ---")
-            sample_images, _ = next(iter(dataset))
-            sample_preds = predict_batch(model, sample_images)
-            save_annotated_images(sample_images, sample_preds, out_dir=self.config["save_images"], class_names=class_names)
-
-
+            try:
+                sample_images, _ = next(iter(dataset))
+                sample_preds = predict_batch(model, sample_images)
+                out_dir = self.config.get("save_images") if self.config.get("save_images") not in (True, None) else "./results"
+                save_annotated_images(sample_images, sample_preds, out_dir=out_dir, class_names=class_names)
+            except Exception as ex:
+                print(f"Could not save annotated images: {ex}")
