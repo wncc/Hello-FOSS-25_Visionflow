@@ -77,14 +77,10 @@ def _build_from_keras_applications(model_name, input_shape, num_classes, weights
 
 
 def get_model(model_name: str, input_shape: tuple, num_classes: int, weights: str = "imagenet"):
-    """
-    Acts as a master factory for creating different types of models based on the
-    `model_name` parameter provided by the user.
-    """
+
     # List of models that are built entirely from scratch within this file
     CUSTOM_MODELS = {
         "simple_cnn": lambda: _build_simple_cnn(input_shape, num_classes),
-        "vit_small": lambda: _build_vit(input_shape, num_classes),
     }
 
     if model_name in CUSTOM_MODELS:
