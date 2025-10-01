@@ -9,13 +9,6 @@ import os
 def get_predictions(model: tf.keras.Model, dataset: tf.data.Dataset):
     """
     Run inference on a dataset and return predictions and ground truth labels.
-
-    Args:
-        model (tf.keras.Model): The trained Keras model.
-        dataset (tf.data.Dataset): A dataset yielding (images, labels) batches.
-
-    Returns:
-        tuple: A tuple containing (predicted_indices, true_labels).
     """
     model.evaluate # Ensure model is in inference mode
     all_preds = []
@@ -32,14 +25,6 @@ def get_predictions(model: tf.keras.Model, dataset: tf.data.Dataset):
 def predict_single(model: tf.keras.Model, image: np.ndarray, class_names: list = None):
     """
     Predict a class for a single image.
-
-    Args:
-        model (tf.keras.Model): The trained Keras model.
-        image (np.ndarray): A single image array (H, W, C).
-        class_names (list, optional): A list to map the output index to a class name.
-
-    Returns:
-        str or int: The predicted class name or index.
     """
     # Add a batch dimension and get prediction
     image_batch = np.expand_dims(image, axis=0)
@@ -53,14 +38,6 @@ def predict_single(model: tf.keras.Model, image: np.ndarray, class_names: list =
 def predict_batch(model: tf.keras.Model, images: np.ndarray, class_names: list = None):
     """
     Predict classes for a batch of images.
-
-    Args:
-        model (tf.keras.Model): The trained Keras model.
-        images (np.ndarray): A batch of images (B, H, W, C).
-        class_names (list, optional): A list to map output indices to class names.
-
-    Returns:
-        list: A list of predicted class names or indices.
     """
     raw_preds = model.predict(images, verbose=0)
     pred_indices = np.argmax(raw_preds, axis=1)
