@@ -7,29 +7,26 @@ import os
 from typing import List, Optional, Tuple, Any, Dict
 
 
-def get_predictions(model: tf.keras.Model, dataset: tf.data.Dataset) -> Tuple[List[int], List[int]]:
-    """
-    Run inference on a dataset and return (predictions, ground_truths) as lists of indices.
-    """
+def get_predictions(model: tf.keras.Model, dataset: tf.data.Dataset):
+    
     all_preds = []
     all_labels = []
 
     for images, labels in dataset:
-        # model.predict accepts tf.Tensor or numpy arrays
-        raw_preds = model.predict(images, verbose=0)
+        raw_preds = model.predict(images, verbose=0)  
         predicted_indices = np.argmax(raw_preds, axis=1)
         all_preds.extend(predicted_indices.tolist())
-        # handle labels being tf.Tensor or numpy
+
         if isinstance(labels, tf.Tensor):
             labels_np = labels.numpy()
         else:
             labels_np = np.array(labels)
-        # If labels are one-hot, convert to indices
         if labels_np.ndim > 1:
             labels_np = np.argmax(labels_np, axis=1)
         all_labels.extend(labels_np.tolist())
 
     return all_preds, all_labels
+
 
 
 def predict_single(model: tf.keras.Model, image: np.ndarray, class_names: Optional[List[str]] = None) -> Any:
