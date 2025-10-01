@@ -5,6 +5,9 @@ from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoa
 import datetime
 import os
 
+class MixUpModel(tf.keras.Model):
+        pass
+
 class Trainer:
     """
     Handles the model compilation and the entire training process.
@@ -13,6 +16,14 @@ class Trainer:
         self.model = model
         self.config = config
         self.history = None
+        self.use_mixup = config.get("use_mixup", False)
+        
+        # If MixUp is enabled, wrap the original model in our custom MixUpModel
+        if self.use_mixup:
+            print("INFO: MixUp augmentation is enabled.")
+            self.model = MixUpModel(inputs=model.input, outputs=model.output)
+        else:
+            self.model = model
 
         # 1. Define the optimizer
         optimizer = tf.keras.optimizers.Adam(
