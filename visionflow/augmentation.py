@@ -3,28 +3,26 @@ import numpy as np
 
 
 def flip_horizontal(img):
-    """Flips an image horizontally."""
+    #Flips an image horizontally.
     return img[:, ::-1]
 
 def flip_vertical(img):
-    """Flips an image vertically."""
+    #Flips an image vertically.
     return img[::-1, :]
 
 def rotate_image(img, angle):
-    """Rotates an image by a given angle in degrees."""
+    #Rotates an image by a given angle.
     theta = np.deg2rad(angle)
     h, w = img.shape[:2]
-    cx, cy = w // 2, h // 2
     rotated = np.zeros_like(img)
     cos_theta, sin_theta = np.cos(theta), np.sin(theta)
     for i in range(h):
         for j in range(w):
-            x = j - cx
-            y = i - cy
-            x_new = int(cos_theta * x + sin_theta * y + cx)
-            y_new = int(-sin_theta * x + cos_theta * y + cy)
+            x_new = int(j * cos_theta - i * sin_theta)
+            y_new = int(j * sin_theta + i * cos_theta)
             if 0 <= x_new < w and 0 <= y_new < h:
-                rotated[i, j] = img[y_new, x_new]
+                rotated[y_new, x_new] = img[i, j]
+                
     return rotated
 
 def adjust_brightness(img, value=50):
