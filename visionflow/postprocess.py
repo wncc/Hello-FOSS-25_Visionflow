@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix, classification_report as sk_classification_report
 import os
 
 
@@ -78,10 +77,43 @@ def compute_accuracy(y_true, y_pred):
     correct = np.sum(y_true == y_pred)
     return correct / len(y_true)
 
+def confusion_matrix(y_true, y_pred, num_classes):
+    cm = np.zeros((num_classes, num_classes), dtype=int)
+    for t, p in zip(y_true, y_pred):
+        cm[t, p] += 1
+    return cm
 
 def classification_report(y_true, y_pred, class_names=None):
-    """Generate a precision/recall/F1 report using scikit-learn."""
-    return sk_classification_report(y_true, y_pred, target_names=class_names)
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    classes = np.unique(np.concatenate((y_true, y_pred)))
+    n_classes = len(classes)
+    
+    cm = confusion_matrix_manual(y_true, y_pred, n_classes)
+    
+    report = {}
+    for i, cls in enumerate(classes):
+        tp = cm[i, i]
+        fp = cm[:, i].sum() - tp
+        fn = cm[i, :].sum() - tp
+        tn = cm.sum() - (tp + fp + fn)
+
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
+        cls_name = class_names[i] if class_names else str(cls)
+        report[cls_name] = {
+            "precision": precision,
+            "recall": recall,
+            "f1-score": f1,
+            "support": cm[i, :].sum()
+        }
+    
+    # Add overall accuracy
+    report["accuracy"] = np.trace(cm) / np.sum(cm)
+    return report
+
 
 # ==============================================================================
 # Visualization and Export Functions
@@ -175,12 +207,20 @@ class Postprocessor:
         if self.config.get("classification_report"):
             print("\n--- Classification Report ---")
             report = classification_report(true_indices, pred_indices, class_names=class_names)
-            print(report)
-
+            for cls, metrics in report.items():
+            print(f"{cls}: {metrics}")
+    
         if self.config.get("confusion_matrix"):
             print("\n--- Displaying Confusion Matrix ---")
-            plot_confusion_matrix(true_indices, pred_indices, class_names)
-        
+            cm = confusion_matrix(true_indices, pred_indices, len(class_names))
+            plt.figure(figsize=(8, 6))
+            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", 
+                xticklabels=class_names, yticklabels=class_names)
+            
+    plt.ylabel("Actual")
+    plt.xlabel("Predicted")
+    plt.title("Confusion Matrix")
+    plt.show()
         if "plot_samples" in self.config:
             print("\n--- Visualizing Sample Predictions ---")
             sample_images, sample_labels = next(iter(dataset))
