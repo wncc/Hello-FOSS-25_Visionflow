@@ -43,13 +43,13 @@ def normalize_img(img):
 #taking median of its surrounding k*k box and updating
 def median_filter(img, ksize=3):
     pad = ksize // 2
-    #Only takes rgb images
+    #Only takes grayscale images
     #border edge cases are not handled
     padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
     out = np.zeros_like(img, dtype=np.float32)
     for i in range(img.shape[0]):
         for j in range(img.shape[1]):
-            region = padded_img[i:i+ksize, j:j+ksize]
+            region = img[i:i+ksize, j:j+ksize]
             for c in range(img.shape[2]):
                  out[i, j, c] = np.median(region[:,:,c])
     return out.astype(img.dtype)
@@ -63,7 +63,7 @@ def Gaussian_kernel(ksize, sigma):
 
 #
 def Gaussian_blur(img, sigma, ksize = 3):
-    #Only takes rgb images
+    #Only takes grayscale images
     #border edge cases are not handled
     kernel = Gaussian_kernel(ksize, sigma)
     pad = ksize // 2
