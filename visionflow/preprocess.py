@@ -63,7 +63,7 @@ def Gaussian_kernel(ksize, sigma):
 
 #
 def Gaussian_blur(img, sigma, ksize = 3):
-    #Only takes grayscale images
+    #Only takes rgb images
     #border edge cases are not handled
     kernel = Gaussian_kernel(ksize, sigma)
     pad = ksize // 2
