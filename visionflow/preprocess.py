@@ -43,7 +43,7 @@ def normalize_img(img):
 #taking median of its surrounding k*k box and updating
 def median_filter(img, ksize=3):
     pad = ksize // 2
-    #Only takes grayscale images
+    #Only takes rgb images
     #border edge cases are not handled
     padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
     out = np.zeros_like(img, dtype=np.float32)
