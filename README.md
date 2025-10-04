@@ -13,7 +13,7 @@ Visionflow is an open-source Python package designed to automate and streamline 
 
 2.  **Install the Visionflow package from GitHub:**
     ```bash
-    pip install visionflow
+    pip install https://github.com/MithraBijumon/visionflow/
     ```
 
 ## Usage
