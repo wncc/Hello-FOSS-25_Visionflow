@@ -2,6 +2,13 @@
 
 Visionflow is an open-source Python package designed to automate and streamline the entire image classification workflow using TensorFlow and Keras. From data loading and custom preprocessing to training diverse model architectures and generating detailed evaluation reports, Visionflow makes experimenting with deep learning for computer vision effortless.
 
+## Motivation
+While exploring multiple vision projects, it was seen that a lot of time was spent rewriting repetitive training loops, managing datasets, and re-implementing evaluation logic.
+VisionFlow was created to solve that — a plug-and-play vision framework that’s:
+- Consistent and reusable across experiments,
+- Modular and beginner-friendly for quick prototypes, and
+- Extensible for research-oriented setups with custom backbones or loss functions.
+
 ## Installation
 
 **Note:** Visionflow requires TensorFlow. It's recommended to install it first.
