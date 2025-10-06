@@ -7,7 +7,8 @@ from . import augmentation
 
 def load_image(path):
     img = cv2.imread(path)
-    # OpenCV loads in BGR, convert to RGB for consistency with other libraries
+    # OpenCV loads in BGR, convert to RGB for consistency with other library 
+    # testung
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
@@ -17,24 +18,25 @@ def resize(img, new_height, new_width):
     original_height, original_width = img.shape[:2]
     height_ratio = original_height / new_height
     width_ratio = original_width / new_width
-    for i in range(new_height):
-        for j in range(new_width):
-            x = int(i * height_ratio)
-            y = int(j * width_ratio)
-            resized_image[i, j] = img[x, y]
+    #coordinate grids for all pixels
+    i_coord = np.arrange(new_height) #[0, 1, ..., new_height - 1]
+    j_coord = np.arrange(new_width)
+
+    x = (i_coord * height_ratio).astype(int)
+    y = (j_coord * width_ratio).astype(int)
+
+    resized_image = img[np.ix_(x, y)] # np.ix_ fits by indexing into the grid
     return resized_image
 
 def grayscale(img):
     #Need to optimize
     height, width = img.shape[:2]
     gray_img = np.zeros((height, width), dtype=np.float32)
-    for i in range(height):
-        for j in range(width):
-            # Using standard RGB channel order
-            R, G, B = img[i, j]
-            gray_value = 0.2989 * R + 0.5870 * G + 0.1140 * B
-            gray_img[i, j] = gray_value
-    return gray_img
+
+    # think of the constants as weights in a NN then,
+    weights = np.array([0.2989, 0.5870, 0.1140])
+    gray_img = np.dot(img, weights)
+    return gray_img.astype(img.dtype)
 
 def normalize_img(img):
     img = img.astype(np.float32)
@@ -46,12 +48,13 @@ def median_filter(img, ksize=3):
     #Only takes rgb images
     #border edge cases are not handled
     padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
-    out = np.zeros_like(img, dtype=np.float32)
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            region = img[i:i+ksize, j:j+ksize]
-            for c in range(img.shape[2]):
-                 out[i, j, c] = np.median(region[:,:,c])
+    '''
+    Now its a CNN related problem where we look into strides.
+    like a window sliding across all the dim, extract the subsets 
+    '''
+    from numpy.lib.stride_tricks import sliding_window_view as win_view
+    windows = win_view(padded_img, (ksize, ksize, img.shape[2])) # img.shape[2] got through the third nested loop ka range
+    out = np.median(windows, axis=(2, 3))
     return out.astype(img.dtype)
 
 #creating gaussian kernel
@@ -67,12 +70,11 @@ def Gaussian_blur(img, sigma, ksize = 3):
     #border edge cases are not handled
     kernel = Gaussian_kernel(ksize, sigma)
     pad = ksize // 2
-    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
+    # standard problem can be handeled using scipy for convolution
+    from scipy.ndimage import convolve
     out = np.zeros_like(img, dtype=np.float32)
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            region = img[i:i+ksize, j:j+ksize]
-            out[i, j] = np.sum(region * kernel[:, :, np.newaxis], axis=(0,1))
+    for c in range(img.shape(2)):
+        out[:, :, c] = convolve(img[:, :, c], kernel, mode = 'reflect')
     return out.astype(img.dtype)
 
 
