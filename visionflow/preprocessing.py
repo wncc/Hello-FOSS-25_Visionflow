@@ -12,29 +12,21 @@ def load_image(path):
     return img
 
 def resize(img, new_height, new_width):
-    # This is very slow, needs to be optimized
-    resized_image = np.zeros((new_height, new_width, img.shape[2]), dtype=img.dtype)
     original_height, original_width = img.shape[:2]
     height_ratio = original_height / new_height
     width_ratio = original_width / new_width
-    for i in range(new_height):
-        for j in range(new_width):
-            x = int(i * height_ratio)
-            y = int(j * width_ratio)
-            resized_image[i, j] = img[x, y]
-    return resized_image
+    
+    y_coords = np.array([int(i * height_ratio) for i in range(new_height)])
+    x_coords = np.array([int(j * width_ratio) for j in range(new_width)])
+    
+    return img[y_coords[:, np.newaxis], x_coords]
+
 
 def grayscale(img):
-    #Need to optimize
-    height, width = img.shape[:2]
-    gray_img = np.zeros((height, width), dtype=np.float32)
-    for i in range(height):
-        for j in range(width):
-            # Using standard RGB channel order
-            R, G, B = img[i, j]
-            gray_value = 0.2989 * R + 0.5870 * G + 0.1140 * B
-            gray_img[i, j] = gray_value
-    return gray_img
+    weights = np.array([0.2989 , 0.5870 , 0.1140])
+    gray_img = np.dot(img , weights)
+    return gray_img.astype(np.float32)
+
 
 def normalize_img(img):
     img = img.astype(np.float32)
