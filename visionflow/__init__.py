@@ -1,3 +1,3 @@
 from .pipeline import ClassificationPipeline
-from .preprocessing import Preprocessor
-from .postprocessing import Postprocessor
+from .preprocess import Preprocessor
+from .postprocess import Postprocessor

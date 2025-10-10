@@ -47,7 +47,8 @@ def median_filter(img, ksize=3):
     pad = ksize // 2
     #Only takes rgb images
     #border edge cases are not handled
-    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
+    #for the border cases issue_2, mode symmetric can be used instead of reflect 
+    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='symmetric')
     '''
     Now its a CNN related problem where we look into strides.
     like a window sliding across all the dim, extract the subsets 
@@ -71,10 +72,15 @@ def Gaussian_blur(img, sigma, ksize = 3):
     kernel = Gaussian_kernel(ksize, sigma)
     pad = ksize // 2
     # standard problem can be handeled using scipy for convolution
+    #issue_2 the opencv's reflect doesn't take edges while scipy's mode = reflect takes the whole thing so...
+    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode = 'reflect')
     from scipy.ndimage import convolve
     out = np.zeros_like(img, dtype=np.float32)
     for c in range(img.shape(2)):
-        out[:, :, c] = convolve(img[:, :, c], kernel, mode = 'reflect')
+        #convolve our padded_image then crop it to original size
+        convolved = convolve(padded_img[:, :, c], kernel, mode = 'constant', cval = 0)
+        #extract centre region i.e. remove padding 
+        out[:, :, c] = convolved[pad: -pad, pad: -pad]
     return out.astype(img.dtype)
 
 
