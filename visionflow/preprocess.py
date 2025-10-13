@@ -19,8 +19,8 @@ def resize(img, new_height, new_width):
     height_ratio = original_height / new_height
     width_ratio = original_width / new_width
     #coordinate grids for all pixels
-    i_coord = np.arrange(new_height) #[0, 1, ..., new_height - 1]
-    j_coord = np.arrange(new_width)
+    i_coord = np.arange(new_height) #[0, 1, ..., new_height - 1]
+    j_coord = np.arange(new_width)
 
     x = (i_coord * height_ratio).astype(int)
     y = (j_coord * width_ratio).astype(int)
@@ -53,8 +53,8 @@ def median_filter(img, ksize=3):
     like a window sliding across all the dim, extract the subsets 
     '''
     from numpy.lib.stride_tricks import sliding_window_view as win_view
-    windows = win_view(padded_img, (ksize, ksize, img.shape[2])) # img.shape[2] got through the third nested loop ka range
-    out = np.median(windows, axis=(2, 3))
+    windows = win_view(padded_img, (ksize, ksize), axis=(0, 1)) # img.shape[2] got through the third nested loop ka range
+    out = np.median(windows, axis=(3, 4))
     return out.astype(img.dtype)
 
 #creating gaussian kernel
@@ -70,11 +70,12 @@ def Gaussian_blur(img, sigma, ksize = 3):
     #border edge cases are not handled
     kernel = Gaussian_kernel(ksize, sigma)
     pad = ksize // 2
+    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
     # standard problem can be handeled using scipy for convolution
     from scipy.ndimage import convolve
     out = np.zeros_like(img, dtype=np.float32)
-    for c in range(img.shape(2)):
-        out[:, :, c] = convolve(img[:, :, c], kernel, mode = 'reflect')
+    for c in range(img.shape[2]):
+        out[:, :, c] = convolve(padded_img[:, :, c], kernel, mode = 'constant', cval = 0.0)[pad:-pad]
     return out.astype(img.dtype)
 
 
