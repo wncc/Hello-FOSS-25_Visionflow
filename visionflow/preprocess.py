@@ -17,23 +17,25 @@ def resize(img, new_height, new_width):
     original_height, original_width = img.shape[:2]
     height_ratio = original_height / new_height
     width_ratio = original_width / new_width
-    for i in range(new_height):
-        for j in range(new_width):
-            x = int(i * height_ratio)
-            y = int(j * width_ratio)
-            resized_image[i, j] = img[x, y]
+    # for i in range(new_height):
+    #    for j in range(new_width):
+    #        x = int(i * height_ratio)
+    #        y = int(j * width_ratio)
+    #        resized_image[i, j] = img[x, y]
+    resized_image=img[np.arange(new_height)*height_ratio,np.arange(new_width)*width_ratio]
     return resized_image
 
 def grayscale(img):
     #Need to optimize
     height, width = img.shape[:2]
     gray_img = np.zeros((height, width), dtype=np.float32)
-    for i in range(height):
-        for j in range(width):
-            # Using standard RGB channel order
-            R, G, B = img[i, j]
-            gray_value = 0.2989 * R + 0.5870 * G + 0.1140 * B
-            gray_img[i, j] = gray_value
+    #for i in range(height):
+    #    for j in range(width):
+    #        # Using standard RGB channel order
+    #        R, G, B = img[i, j]
+    #        gray_value = 0.2989 * R + 0.5870 * G + 0.1140 * B
+    #        gray_img[i, j] = gray_value
+    gray_img=np.dot(img,[0.2989,0.5870,0.1140])
     return gray_img
 
 def normalize_img(img):
