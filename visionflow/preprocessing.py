@@ -53,7 +53,7 @@ def median_filter(img, ksize=3):
     like a window sliding across all the dim, extract the subsets 
     '''
     from numpy.lib.stride_tricks import sliding_window_view as win_view
-    windows = win_view(padded_img, (ksize, ksize), axis=(0, 1)) # img.shape[2] got through the third nested loop ka range
+    windows = win_view(padded_img, (ksize, ksize), axis=(0, 1))
     out = np.median(windows, axis=(3, 4))
     return out.astype(img.dtype)
 
