@@ -9,23 +9,24 @@ from typing import List, Optional, Tuple, Any, Dict
 
 def get_predictions(model: tf.keras.Model, dataset: tf.data.Dataset):
     
-    all_preds = []
-    all_labels = []
+    raw_preds = model.predict(dataset, verbose=0)
+    preds_np = np.argmax(raw_preds, axis=1)
 
-    for images, labels in dataset:
-        raw_preds = model.predict(images, verbose=0)  
-        predicted_indices = np.argmax(raw_preds, axis=1)
-        all_preds.extend(predicted_indices.tolist())
-
-        if isinstance(labels, tf.Tensor):
-            labels_np = labels.numpy()
-        else:
-            labels_np = np.array(labels)
+    label_tensors = []
+    for _, labels in dataset:
+        if not tf.is_tensor(labels):
+            labels = tf.convert_to_tensor(labels)
+        label_tensors.append(labels)
+        
+    if label_tensors:
+        labels_concat = tf.concat(label_tensors, axis=0)
+        labels_np = labels_concat.numpy()
         if labels_np.ndim > 1:
             labels_np = np.argmax(labels_np, axis=1)
-        all_labels.extend(labels_np.tolist())
+    else:
+        labels_np = np.array([], dtype=int)
 
-    return all_preds, all_labels
+    return preds_np, labels_np
 
 
 
