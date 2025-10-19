@@ -66,12 +66,27 @@ def compute_accuracy(y_true, y_pred) -> float:
     return float(correct) / len(y_true)
 
 
-def confusion_matrix(y_true, y_pred, num_classes):
-    
+def confusion_matrix(y_true, y_pred, labels : Optional[List] = None):
+    """ Compute a confusion matrix from true and predicted labels."""
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+
+    if labels is None:
+        labels = np.unique(np.concatenate((y_true, y_pred)))
+
+    num_classes = len(labels)
+    # Label to index mapping
+    label_to_index = {label : i for i  , label in enumerate(labels)}
+
     cm = np.zeros((num_classes, num_classes), dtype=int)
     for t, p in zip(y_true, y_pred):
-        cm[t, p] += 1
-    return cm
+        true_index = label_to_index.get(t)
+        pred_index = label_to_index.get(p)
+
+        if true_index is not None and pred_index is not None:
+            cm[true_index, pred_index] += 1
+
+    return cm , labels
 
 
 def classification_report(y_true, y_pred, class_names: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
@@ -129,11 +144,18 @@ def classification_report(y_true, y_pred, class_names: Optional[List[str]] = Non
 
 def plot_confusion_matrix(y_true, y_pred, class_names: Optional[List[str]] = None, figsize=(10, 8), cmap="Blues"):
     """Plots and displays a confusion matrix (rows = actual, cols = predicted)."""
-    cm, labels = confusion_matrix(y_true, y_pred, labels=class_names if class_names is not None else None)
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+
+    # passing labels as none to letting confusion matrix handle labels completely
+    cm, labels = confusion_matrix(y_true, y_pred, labels=None)
 
     plt.figure(figsize=figsize)
     # if labels are numeric, convert to strings for ticklabels
-    ticklabels = [str(l) for l in labels]
+    if class_names is not None:
+        ticklabels = class_names
+    else:
+        ticklabels = [str(l) for l in labels]
     sns.heatmap(cm, annot=True, fmt="d", cmap=cmap,
                 xticklabels=ticklabels, yticklabels=ticklabels)
     plt.ylabel("Actual")
