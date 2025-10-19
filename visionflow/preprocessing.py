@@ -2,7 +2,7 @@ import tensorflow as tf
 import cv2
 import numpy as np
 import os
-from . import augmentation 
+from . import augmentation
 
 
 def load_image(path):
@@ -119,7 +119,7 @@ def Gaussian_blur(img, sigma, ksize = 3):
 
 
 class Preprocessor:
-    # Let a user preprocess with custom configurations given by them 
+    # Let a user preprocess with custom configurations given by them
     def __init__(self, config: dict):
         self.config = config
 
@@ -133,7 +133,7 @@ class Preprocessor:
 
         if self.config.get("flip_horizontal", False) and np.random.rand() > 0.5:
             img = augmentation.flip_horizontal(img)
-        
+
         if "adjust_brightness" in self.config:
             params = self.config["adjust_brightness"]
             value = np.random.randint(-params.get("value", 30), params.get("value", 30))
@@ -142,7 +142,7 @@ class Preprocessor:
         if "median_filter" in self.config:
             params = self.config["median_filter"]
             img = median_filter(img, ksize=params.get("ksize", 3))
-        
+
         if "gaussian_blur" in self.config:
             params = self.config["gaussian_blur"]
             img = Gaussian_blur(img, ksize=params.get("ksize", 3), sigma=params.get("sigma", 1.0))
@@ -175,14 +175,14 @@ def create_dataset_from_directory(data_path: str, batch_size: int, preprocessor:
     def apply_custom_preprocessing(path, label):
         img_h = preprocessor.config["resize"]["height"]
         img_w = preprocessor.config["resize"]["width"]
-        
+
         image = tf.py_function(func=preprocessor.process, inp=[path], Tout=tf.float32)
-        
+
         image.set_shape((img_h, img_w, 3))
         return image, label
 
     dataset = dataset.map(apply_custom_preprocessing, num_parallel_calls=tf.data.AUTOTUNE)
-    
+
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
 
