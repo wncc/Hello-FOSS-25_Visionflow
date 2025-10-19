@@ -7,8 +7,7 @@ from . import augmentation
 
 def load_image(path):
     img = cv2.imread(path)
-    # OpenCV loads in BGR, convert to RGB for consistency with other library 
-    # testung
+    # OpenCV loads in BGR, convert to RGB for consistency with other libraries
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
@@ -84,6 +83,7 @@ def Gaussian_blur(img, sigma, ksize = 3):
     return out.astype(img.dtype)
 
 
+
 class Preprocessor:
     # Let a user preprocess with custom configurations given by them 
     def __init__(self, config: dict):
@@ -154,4 +154,3 @@ def create_dataset_from_directory(data_path: str, batch_size: int, preprocessor:
 
     print(f"Dataset created using preprocessor.")
     return dataset
-

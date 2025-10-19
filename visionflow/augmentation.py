@@ -11,18 +11,27 @@ def flip_vertical(img):
     return img[::-1, :]
 
 def rotate_image(img, angle):
-    #Rotates an image by a given angle.
-    theta = np.deg2rad(angle)
+    #Rotates an image by a specified angle (in degrees counter-clockwise).
+    theta = np.deg2rad(angle) 
     h, w = img.shape[:2]
-    rotated = np.zeros_like(img)
-    cos_theta, sin_theta = np.cos(theta), np.sin(theta)
-    for i in range(h):
-        for j in range(w):
-            x_new = int(j * cos_theta - i * sin_theta)
-            y_new = int(j * sin_theta + i * cos_theta)
-            if 0 <= x_new < w and 0 <= y_new < h:
-                rotated[y_new, x_new] = img[i, j]
-                
+    r = np.sqrt((w/2)**2 + (h/2)**2)
+    rotated = np.zeros((int(h + 2*r*(1-np.cos(theta))), int(w + 2*r*(1-np.cos(theta))), img.shape[2]), dtype=img.dtype)
+    center_x, center_y = h // 2, w // 2
+    rot_center_x, rot_center_y = rotated.shape[0] // 2, rotated.shape[1] // 2
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            # Change in axis
+            x = i - center_x
+            y = j - center_y
+
+            # Rotated coordinates
+            x_new = int(x * np.cos(theta) - y * np.sin(theta)) + rot_center_x 
+            y_new = int(x * np.sin(theta) + y * np.cos(theta)) + rot_center_y
+
+            # Project to new image
+            if 0 <= x_new < rotated.shape[0] and 0 <= y_new < rotated.shape[1]:
+                rotated[x_new, y_new] = img[i, j]
+
     return rotated
 
 def adjust_brightness(img, value=50):
