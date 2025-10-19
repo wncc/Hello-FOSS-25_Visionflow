@@ -9,23 +9,24 @@ from typing import List, Optional, Tuple, Any, Dict
 
 def get_predictions(model: tf.keras.Model, dataset: tf.data.Dataset):
     
-    all_preds = []
-    all_labels = []
+    raw_preds = model.predict(dataset, verbose=0)
+    preds_np = np.argmax(raw_preds, axis=1)
 
-    for images, labels in dataset:
-        raw_preds = model.predict(images, verbose=0)  
-        predicted_indices = np.argmax(raw_preds, axis=1)
-        all_preds.extend(predicted_indices.tolist())
-
-        if isinstance(labels, tf.Tensor):
-            labels_np = labels.numpy()
-        else:
-            labels_np = np.array(labels)
+    label_tensors = []
+    for _, labels in dataset:
+        if not tf.is_tensor(labels):
+            labels = tf.convert_to_tensor(labels)
+        label_tensors.append(labels)
+        
+    if label_tensors:
+        labels_concat = tf.concat(label_tensors, axis=0)
+        labels_np = labels_concat.numpy()
         if labels_np.ndim > 1:
             labels_np = np.argmax(labels_np, axis=1)
-        all_labels.extend(labels_np.tolist())
+    else:
+        labels_np = np.array([], dtype=int)
 
-    return all_preds, all_labels
+    return preds_np, labels_np
 
 
 
@@ -66,12 +67,27 @@ def compute_accuracy(y_true, y_pred) -> float:
     return float(correct) / len(y_true)
 
 
-def confusion_matrix(y_true, y_pred, num_classes):
-    
+def confusion_matrix(y_true, y_pred, labels : Optional[List] = None):
+    """ Compute a confusion matrix from true and predicted labels."""
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+
+    if labels is None:
+        labels = np.unique(np.concatenate((y_true, y_pred)))
+
+    num_classes = len(labels)
+    # Label to index mapping
+    label_to_index = {label : i for i  , label in enumerate(labels)}
+
     cm = np.zeros((num_classes, num_classes), dtype=int)
     for t, p in zip(y_true, y_pred):
-        cm[t, p] += 1
-    return cm
+        true_index = label_to_index.get(t)
+        pred_index = label_to_index.get(p)
+
+        if true_index is not None and pred_index is not None:
+            cm[true_index, pred_index] += 1
+
+    return cm , labels
 
 
 def classification_report(y_true, y_pred, class_names: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
@@ -129,11 +145,18 @@ def classification_report(y_true, y_pred, class_names: Optional[List[str]] = Non
 
 def plot_confusion_matrix(y_true, y_pred, class_names: Optional[List[str]] = None, figsize=(10, 8), cmap="Blues"):
     """Plots and displays a confusion matrix (rows = actual, cols = predicted)."""
-    cm, labels = confusion_matrix(y_true, y_pred, labels=class_names if class_names is not None else None)
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+
+    # passing labels as none to letting confusion matrix handle labels completely
+    cm, labels = confusion_matrix(y_true, y_pred, labels=None)
 
     plt.figure(figsize=figsize)
     # if labels are numeric, convert to strings for ticklabels
-    ticklabels = [str(l) for l in labels]
+    if class_names is not None:
+        ticklabels = class_names
+    else:
+        ticklabels = [str(l) for l in labels]
     sns.heatmap(cm, annot=True, fmt="d", cmap=cmap,
                 xticklabels=ticklabels, yticklabels=ticklabels)
     plt.ylabel("Actual")
