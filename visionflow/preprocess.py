@@ -19,8 +19,8 @@ def resize(img, new_height, new_width):
     height_ratio = original_height / new_height
     width_ratio = original_width / new_width
     #coordinate grids for all pixels
-    i_coord = np.arrange(new_height) #[0, 1, ..., new_height - 1]
-    j_coord = np.arrange(new_width)
+    i_coord = np.arange(new_height) #[0, 1, ..., new_height - 1]
+    j_coord = np.arange(new_width)
 
     x = (i_coord * height_ratio).astype(int)
     y = (j_coord * width_ratio).astype(int)
@@ -76,7 +76,7 @@ def Gaussian_blur(img, sigma, ksize = 3):
     padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode = 'reflect')
     from scipy.ndimage import convolve
     out = np.zeros_like(img, dtype=np.float32)
-    for c in range(img.shape(2)):
+    for c in range(img.shape[2]):
         #convolve our padded_image then crop it to original size
         convolved = convolve(padded_img[:, :, c], kernel, mode = 'constant', cval = 0)
         #extract centre region i.e. remove padding 
