@@ -54,7 +54,7 @@ def median_filter(img, ksize=3):
     '''
     from numpy.lib.stride_tricks import sliding_window_view as win_view
     windows = win_view(padded_img, (ksize, ksize, img.shape[2])) # img.shape[2] got through the third nested loop ka range
-    out = np.median(windows, axis=(2, 3))
+    out = np.median(windows, axis=(3, 4))
     return out.astype(img.dtype)
 
 #creating gaussian kernel
