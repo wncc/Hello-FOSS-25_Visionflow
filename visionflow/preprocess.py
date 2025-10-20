@@ -7,7 +7,8 @@ from . import augmentation
 
 def load_image(path):
     img = cv2.imread(path)
-    # OpenCV loads in BGR, convert to RGB for consistency with other libraries
+    # OpenCV loads in BGR, convert to RGB for consistency with other library 
+    # testung
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
@@ -46,14 +47,16 @@ def normalize_img(img):
 def median_filter(img, ksize=3):
     pad = ksize // 2
     #Only takes rgb images
-    
-    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
-    out = np.zeros_like(img, dtype=np.float32)
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            region = padded_img[i:i+ksize, j:j+ksize]
-            for c in range(img.shape[2]):
-                 out[i, j, c] = np.median(region[:,:,c])
+    #border edge cases are not handled
+    #for the border cases issue_2, mode symmetric can be used instead of reflect 
+    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='symmetric')
+    '''
+    Now its a CNN related problem where we look into strides.
+    like a window sliding across all the dim, extract the subsets 
+    '''
+    from numpy.lib.stride_tricks import sliding_window_view as win_view
+    windows = win_view(padded_img, (ksize, ksize, img.shape[2])) # img.shape[2] got through the third nested loop ka range
+    out = np.median(windows, axis=(2, 3))
     return out.astype(img.dtype)
 
 #creating gaussian kernel
@@ -69,12 +72,16 @@ def Gaussian_blur(img, sigma, ksize = 3):
     
     kernel = Gaussian_kernel(ksize, sigma)
     pad = ksize // 2
-    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode='reflect')
+    # standard problem can be handeled using scipy for convolution
+    #issue_2 the opencv's reflect doesn't take edges while scipy's mode = reflect takes the whole thing so...
+    padded_img = np.pad(img, [(pad, pad), (pad, pad), (0, 0)], mode = 'reflect')
+    from scipy.ndimage import convolve
     out = np.zeros_like(img, dtype=np.float32)
-    for i in range(img.shape[0]):
-        for j in range(img.shape[1]):
-            region = padded_img[i:i+ksize, j:j+ksize]
-            out[i, j] = np.sum(region * kernel[:, :, np.newaxis], axis=(0,1))
+    for c in range(img.shape[2]):
+        #convolve our padded_image then crop it to original size
+        convolved = convolve(padded_img[:, :, c], kernel, mode = 'constant', cval = 0)
+        #extract centre region i.e. remove padding 
+        out[:, :, c] = convolved[pad: -pad, pad: -pad]
     return out.astype(img.dtype)
 
 
