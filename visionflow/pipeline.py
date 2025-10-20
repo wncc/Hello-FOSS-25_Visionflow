@@ -3,10 +3,10 @@ import numpy as np
 import os
 
 #Importing all our modules
-from .preprocess import Preprocessor, create_dataset_from_directory
+from .preprocessing import Preprocessor, create_dataset_from_directory
 from .models import get_model
 from .trainer import Trainer
-from .postprocess import Postprocessor
+from .postprocessing import Postprocessor
 
 
 class ClassificationPipeline:
