@@ -10,10 +10,26 @@ def load_image(path):
     # OpenCV loads in BGR, convert to RGB for consistency with other libraries
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
+    
+
+#for the issue_3 we create some helper functions
+def _is_grayscale(img):
+    return img.ndim == 2 or (img.ndim == 3 and img.shape[2] == 1)
+
+def _ensure_3d(img):
+    if img.ndim == 2:
+        return img[:, :, np.newaxis]
+    return img
+
+def _match_input_format(img, original_shape):
+    if len(original_shape) == 2:  # original was 2D(H, W)
+        if img.ndim == 3 and img.shape[2] == 1:
+            return np.squeeze(img, axis=2)
+        return img
+    return img
 
 def resize(img, new_height, new_width):
     # This is very slow, needs to be optimized
-    resized_image = np.zeros((new_height, new_width, img.shape[2]), dtype=img.dtype)
     original_height, original_width = img.shape[:2]
     height_ratio = original_height / new_height
     width_ratio = original_width / new_width
@@ -28,14 +44,25 @@ def resize(img, new_height, new_width):
     return resized_image
 
 def grayscale(img):
-    #Need to optimize
+    #check if already grayscale
+    if _is_grayscale(img):
+        if img.ndim == 3: #for (H, W, 1) -> (H, W)
+            return np.squeeze(img, axis=2)
+        return img
+    #initialize
     height, width = img.shape[:2]
     gray_img = np.zeros((height, width), dtype=np.float32)
-
+    
     # think of the constants as weights in a NN then,
-    weights = np.array([0.2989, 0.5870, 0.1140])
-    gray_img = np.dot(img, weights)
-    return gray_img.astype(img.dtype)
+    if img.ndim == 3 and img.shape[2] == 3: #
+        weights = np.array([0.2989, 0.5870, 0.1140])
+        gray_img = np.dot(img, weights)
+        return gray_img.astype(img.dtype)
+    
+    if img.ndim == 3 and img.shape[2] >= 3: # for 4+ channels like RGBA
+        weights = np.array([0.2989, 0.5870, 0.1140]) #ignore alpha channel
+        gray_img = np.dot(img[:, :, :3], weights)
+        return gray_img.astype(img.dtype)
 
 def normalize_img(img):
     img = img.astype(np.float32)
@@ -43,6 +70,10 @@ def normalize_img(img):
 
 #taking median of its surrounding k*k box and updating
 def median_filter(img, ksize=3):
+    #for format matching
+    original_shape = img.shape
+    img = _ensure_3d(img)
+
     pad = ksize // 2
     #Only takes rgb images
     #border edge cases are not handled
@@ -53,9 +84,10 @@ def median_filter(img, ksize=3):
     like a window sliding across all the dim, extract the subsets 
     '''
     from numpy.lib.stride_tricks import sliding_window_view as win_view
-    windows = win_view(padded_img, (ksize, ksize), axis=(0, 1))
+    windows = win_view(padded_img, (ksize, ksize), axis=(0, 1)) # img.shape[2] got through the third nested loop ka range
     out = np.median(windows, axis=(3, 4))
-    return out.astype(img.dtype)
+    result = _match_input_format(out, original_shape)
+    return result.astype(img.dtype)
 
 #creating gaussian kernel
 def Gaussian_kernel(ksize, sigma):
@@ -67,7 +99,9 @@ def Gaussian_kernel(ksize, sigma):
 #
 def Gaussian_blur(img, sigma, ksize = 3):
     #Only takes rgb images
-    
+    #border edge cases are not handled
+    original_shape = img.shape
+    img = _ensure_3d(img)
     kernel = Gaussian_kernel(ksize, sigma)
     pad = ksize // 2
     # standard problem can be handeled using scipy for convolution
@@ -80,7 +114,8 @@ def Gaussian_blur(img, sigma, ksize = 3):
         convolved = convolve(padded_img[:, :, c], kernel, mode = 'constant', cval = 0)
         #extract centre region i.e. remove padding 
         out[:, :, c] = convolved[pad: -pad, pad: -pad]
-    return out.astype(img.dtype)
+    result = _match_input_format(out, original_shape)
+    return result.astype(img.dtype)
 
 
 
